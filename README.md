@@ -21,7 +21,21 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-On Streamlit Community Cloud: new app → this repository → *Main file path* `app.py`.
+## Deploy on Streamlit Community Cloud
+
+1. Go to https://share.streamlit.io and sign in with the GitHub account `taggestao`.
+2. On the first login, authorize Streamlit to access **private** repositories
+   (Settings → Linked accounts → GitHub → *Authorize private repos*).
+3. **Create app** → *Deploy a public app from GitHub* and fill in:
+   - Repository: `taggestao/monitor-bolsa-etfs`
+   - Branch: `main`
+   - Main file path: `app.py`
+   - App URL (optional): e.g. `tag-monitor-bolsa`
+4. *Advanced settings* → Python **3.11**. No secrets needed (the data are in `tag_equities.json`).
+5. **Deploy**. Every push to `main` redeploys the app automatically.
+
+Private repo → the app is private by default: share it under *Settings → Sharing* with the TAG
+team's emails (or make it public, if appropriate).
 
 ## Updating the data
 
