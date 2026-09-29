@@ -200,6 +200,40 @@ def render_overview():
         "dado no período (DRAM só existe desde 01/04/2026; BRIJ desde 03/09/2024). "
         "† DRAM: retorno desde o início (01/04/2026). * DRAM: vol anualizada desde o início.")
 
+    # ── Retorno por ano-calendário + USD/BRL ──
+    _section("📅 Retorno por ano-calendário (USD) e variação cambial")
+    cal = data["calendar"]
+    years = [str(y) for y in cal["years"]]
+    head = [f"{y} (YTD)" if y == years[0] else y for y in years]
+    crows = []
+    for r in cal["rows"]:
+        cells = [_pill(r["key"]), _pct(r["weight"], 1)]
+        for y in years:
+            v = _ret(r["returns"][y])
+            if r["flags"].get(y) and r["returns"][y] is not None:
+                v += "<sup>†</sup>"
+            cells.append(v)
+        crows.append({"cells": cells})
+    crows.append({"_style": f"background:{TAG_VINHO}0d;font-weight:700", "cells":
+                  ["<b>Carteira TAG (USD)</b>", "100%"] + [_ret(cal["portfolio"][y]) for y in years]})
+    crows.append({"_style": "background:#f7f7f7;border-top:2px solid #ddd", "cells":
+                  ["<b>USD/BRL</b> <span style='color:#888;font-size:11px'>(PTAX)</span>", "—"]
+                  + [_ret(cal["usdbrl"][y]) for y in years]})
+    crows.append({"_style": "background:#f7f7f7;font-weight:700", "cells":
+                  ["<b>Carteira TAG em BRL</b>", "—"] + [_ret(cal["portfolio_brl"][y]) for y in years]})
+    _table(["ETF", "Peso"] + head, crows, min_width=760)
+    lv = cal["usdbrl_levels"]
+    cov_txt = " · ".join(f"{y}: {_num(cal['portfolio_cov'][y], 0)}%" for y in years)
+    st.caption(
+        f"Retorno total em USD. {years[0]} = acumulado no ano até {_br_date(data['reference_date'])}. "
+        "Em branco: ETF ainda não existia ou teve ano parcial de lançamento (BRIJ 03/09/2024, GRDU 14/04/2022). "
+        "† DRAM: desde o início (01/04/2026), fora da média da carteira. Carteira = média pelos pesos atuais, "
+        f"renormalizada para os ETFs com ano completo (cobertura — {cov_txt}). "
+        "USD/BRL = variação da PTAX venda do Banco Central entre fins de ano "
+        f"(R$ {_num(lv['2021'], 4)} → {_num(lv['2022'], 4)} → {_num(lv['2023'], 4)} → {_num(lv['2024'], 4)} → "
+        f"{_num(lv['2025'], 4)} → {_num(lv['ref'], 4)} em {_br_date(data['reference_date'])}); positivo = real "
+        "desvalorizou. Carteira em BRL = (1 + retorno USD) × (1 + variação USD/BRL) − 1.")
+
     # ── Valuation ──
     _section("💰 Valuation e fundamentos (carteira de cada ETF)")
     vrows = []

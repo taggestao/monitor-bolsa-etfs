@@ -8,6 +8,7 @@ Executar a cada atualização dos dados (ou da alocação em PORTFOLIO).
 Fontes:
   • Morningstar MCP — preço, AUM, retornos, vol, valuation dos ETFs e das ações, holdings,
     X-Ray da carteira (setores, P/E, P/B, ROE). Coleta em REF_DATE.
+  • USD/BRL — PTAX venda do Banco Central no fim de cada ano e em 28/09/2026.
   • Câmbio (para converter market cap de ações fora dos EUA em USD) — cotações públicas de
     29/09/2026 (Trading Economics / exchangerates.org.uk / MTFX via busca web).
 """
@@ -218,6 +219,24 @@ MS_ETF = {
                  eg_hist=11.69699, ter=None, n_stocks=108, inception="2022-04-14",
                  category="Sector Equity Infrastructure", idx_0831=61.96800, idx_0928=61.86100),
 }
+
+# ── Retorno por ano-calendário: Daily Return Index (HS793) no último dia de cada ano ──
+# (Morningstar; fins de semana/feriados repetem o último pregão). None = ETF ainda não existia.
+# Ano parcial de lançamento (BRIJ 2024, GRDU 2022) fica em branco; DRAM 2026 = desde o início.
+YEAR_END_INDEX = {
+    #        2021-12-31  2022-12-31  2023-12-31  2024-12-31  2025-12-31
+    "CSPX": (486.51790, 397.24380, 500.19310, 623.67180, 733.32100),
+    "CIBR": (55.03338, 40.52761, 56.41080, 66.93674, 75.70120),
+    "BKCH": (91.14712, 13.46298, 49.94033, 59.19177, 75.32183),
+    "BRIJ": (None, None, None, 15.20826, 21.99706),
+    "SOXQ": (31.30005, 20.34144, 33.90375, 40.70264, 58.23536),
+    "DRAM": (None, None, None, None, None),
+    "GRDU": (None, 29.33100, 35.50900, 40.95100, 53.00800),
+}
+CAL_YEARS = [2026, 2025, 2024, 2023, 2022]
+
+# ── USD/BRL — PTAX venda (Banco Central) no último dia útil de cada ano e na data de referência ──
+USDBRL_PTAX = {2021: 5.5805, 2022: 5.2177, 2023: 4.8413, 2024: 6.1923, 2025: 5.5024, "ref": 5.2132}
 
 # DRAM: Daily Return Index (HS793) desde o lançamento — usado para retorno desde o início e
 # vol anualizada desde o início (fundo não tem 12 meses de histórico). Dias sem negociação
@@ -604,9 +623,43 @@ def build_lookthrough():
     return out, agg10
 
 
+def build_calendar(etfs):
+    """Retorno total em USD por ano-calendário (2026 = YTD até REF_DATE) + USD/BRL."""
+    by_key = {e["key"]: e for e in etfs}
+    rows = []
+    for key in ETF_ORDER:
+        idx = dict(zip([2021, 2022, 2023, 2024, 2025], YEAR_END_INDEX[key]))
+        idx[2026] = MS_ETF[key]["idx_0928"]
+        rets, flags = {}, {}
+        for y in CAL_YEARS:
+            a, b = idx.get(y - 1), idx.get(y)
+            rets[y] = (b / a - 1) * 100 if a and b else None
+        if key == "DRAM":
+            rets[2026] = by_key["DRAM"]["since_inception"]
+            flags[2026] = "desde 01/04/2026"
+        rows.append({"key": key, "weight": WEIGHTS[key], "returns": rets, "flags": flags})
+    port, cov = {}, {}
+    for y in CAL_YEARS:
+        pairs = [(r["weight"], r["returns"][y]) for r in rows if r["returns"][y] is not None
+                 and not r["flags"].get(y)]
+        tw = sum(w for w, _ in pairs)
+        port[y] = sum(w * v for w, v in pairs) / tw if tw else None
+        cov[y] = tw
+    fx = {}
+    for y in CAL_YEARS:
+        end = USDBRL_PTAX["ref"] if y == 2026 else USDBRL_PTAX[y]
+        fx[y] = (end / USDBRL_PTAX[y - 1] - 1) * 100
+    port_brl = {y: None if port[y] is None else ((1 + port[y] / 100) * (1 + fx[y] / 100) - 1) * 100
+                for y in CAL_YEARS}
+    return {"years": CAL_YEARS, "rows": rows, "portfolio": port, "portfolio_cov": cov,
+            "usdbrl": fx, "usdbrl_levels": {str(k): v for k, v in USDBRL_PTAX.items()},
+            "portfolio_brl": port_brl}
+
+
 def main():
     etfs = build_etfs()
     port = build_portfolio(etfs)
+    calendar = build_calendar(etfs)
     top10 = build_top10()
     look, agg10 = build_lookthrough()
 
@@ -624,7 +677,7 @@ def main():
         "reference_date": REF_DATE, "mo_end_date": MO_END_DATE, "holdings_date": HOLDINGS_DATE,
         "source": "Morningstar MCP (Data Tool, Fund Holdings, X-Ray) · câmbio: fontes públicas 29/09/2026",
         "fx_per_usd": FX_PER_USD,
-        "etfs": etfs, "portfolio": port, "xray": XRAY,
+        "etfs": etfs, "portfolio": port, "calendar": calendar, "xray": XRAY,
         "top10": top10, "lookthrough": look, "lookthrough_top10": agg10,
     }
     with open(OUT, "w", encoding="utf-8") as f:
