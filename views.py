@@ -172,14 +172,31 @@ def render_overview():
             f"<div style='background:#fff;border:1px solid rgba(99,13,36,0.15);"
             f"border-top:4px solid {ETF_COLORS[e['key']]};border-radius:10px;padding:8px 10px;flex:1 1 0;min-width:0'>"
             f"<div style='display:flex;justify-content:space-between;align-items:center'>{_pill(e['key'])}"
-            f"<span style='font-size:11px;color:{TAG_GRAY}'>desde {_br_date(e['entry_date'])}</span></div>"
+            f"<span style='font-size:10.5px;color:{TAG_GRAY};white-space:nowrap'>{_br_date(e['entry_date'])}</span></div>"
             f"<div style='font-size:1.3rem;font-weight:700;color:{rc};margin-top:4px'>"
             f"{'+' if r >= 0 else ''}{_pct(r)}</div>"
             f"<div style='font-size:11px;color:{TAG_GRAY}'>vs. CSPX: {_pp(diff)}</div></div>")
+    es = data["entry_summary"]
+    beat = es["diff"] >= 0
+    bc = TAG_GREEN if beat else TAG_RED
+    cards += (
+        f"<div style='background:{TAG_VINHO};color:#fff;border-radius:10px;padding:8px 12px;flex:1.35 1 0;min-width:0'>"
+        f"<div style='font-size:11px;font-weight:700;letter-spacing:.3px;opacity:.9'>MÉDIA PONDERADA DOS TEMAS</div>"
+        f"<div style='display:flex;gap:10px;align-items:baseline;margin-top:4px'>"
+        f"<span style='font-size:1.3rem;font-weight:700'>{'+' if es['avg'] >= 0 else ''}{_pct(es['avg'])}</span>"
+        f"<span style='font-size:11px;opacity:.85'>vs. S&P {'+' if es['avg_cspx'] >= 0 else ''}{_pct(es['avg_cspx'])}</span></div>"
+        f"<div style='font-size:11px;margin-top:2px'><span style='background:#fff;color:{bc};font-weight:700;"
+        f"padding:0 6px;border-radius:6px'>{'▲ bate' if beat else '▼ perde para'} o S&P "
+        f"{'+' if es['diff'] >= 0 else ''}{_num(es['diff'], 2)} p.p.</span></div></div>")
     st.markdown(
         f"<div style='margin:14px 0 4px 0;font-size:12px;font-weight:700;color:{TAG_VINHO};"
         f"text-transform:uppercase;letter-spacing:.4px'>🎯 Retorno desde a entrada de cada tema (USD)</div>"
-        f"<div style='display:flex;gap:6px;overflow-x:auto'>{cards}</div>", unsafe_allow_html=True)
+        f"<div style='display:flex;gap:6px;overflow-x:auto'>{cards}</div>"
+        f"<div style='font-size:11.5px;color:{TAG_GRAY};margin-top:4px'>Média ponderada pelo peso de cada tema na "
+        f"carteira TAG ({_pct(es['weight'], 0)} do total, {es['n']} temas) vs. o S&P 500 (CSPX) nas mesmas janelas. "
+        f"Efeito na carteira inteira vs. manter esse capital no S&P: <b style='color:{bc}'>"
+        f"{'+' if es['excess_total'] >= 0 else ''}{_num(es['excess_total'], 2)} p.p.</b></div>",
+        unsafe_allow_html=True)
 
     # ── Alocação ──
     _section("🧩 Alocação e camada do ecossistema")
@@ -238,12 +255,21 @@ def render_overview():
             _pill(e["key"]), e["camada"], _pct(e["weight"], 1), _br_date(e["entry_date"]), _num(days, 0),
             _ret(e["since_entry"]), _ret(e["cspx_since_entry"]), _pp(e["since_entry"] - e["cspx_since_entry"]),
         ]})
+    es = data["entry_summary"]
+    erows.append({"_style": f"background:{TAG_VINHO}0d;font-weight:700", "cells": [
+        "<b>Média ponderada</b>", f"{es['n']} temas", _pct(es["weight"], 1), "—", "—",
+        _ret(es["avg"]), _ret(es["avg_cspx"]), _pp(es["diff"], 2)]})
+    erows.append({"_style": "background:#f7f7f7", "cells": [
+        "Efeito na carteira TAG", "Σ peso × (tema − CSPX)", "100%", "—", "—", "—", "—", _pp(es["excess_total"], 2)]})
     _table(["Tema", "Camada", "Peso", "Entrada", "Dias", "Retorno desde a entrada", "CSPX no período",
             "Diferença vs. CSPX"], erows, min_width=900)
     st.caption(
         "Retorno total em USD do fechamento da data de entrada até "
         f"{_br_date(data['reference_date'])} (Daily Return Index Morningstar). CSPX no período = S&P 500 (núcleo "
-        "da carteira) entre as mesmas datas; diferença em pontos percentuais. Períodos curtos, sem anualizar.")
+        "da carteira) entre as mesmas datas; diferença em pontos percentuais. Períodos curtos, sem anualizar. "
+        "Média ponderada = Σ peso × retorno ÷ Σ pesos dos temas (cada tema na sua própria janela); o S&P é ponderado "
+        "da mesma forma, então a comparação é justa. Efeito na carteira = quanto os temas somaram (ou tiraram) do "
+        "retorno total da carteira TAG vs. ter o mesmo capital no S&P 500.")
 
     # ── Retorno por ano-calendário + USD/BRL ──
     _section("📅 Retorno por ano-calendário (USD) e variação cambial")

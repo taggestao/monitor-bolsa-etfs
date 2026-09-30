@@ -398,6 +398,14 @@
     "ter": 0.2633,
     "ter_cov": 93.2
   },
+  "entry_summary": {
+    "weight": 50.0,
+    "avg": 9.5422,
+    "avg_cspx": 9.2313,
+    "diff": 0.3108,
+    "excess_total": 0.1554,
+    "n": 6
+  },
   "calendar": {
     "years": [
       2026,

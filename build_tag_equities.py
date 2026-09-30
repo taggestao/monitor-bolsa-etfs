@@ -641,6 +641,19 @@ def build_lookthrough():
     return out, agg10
 
 
+def build_entry_summary(etfs):
+    """Média dos temas desde a entrada, ponderada pelo peso de cada tema na carteira TAG,
+    vs. o CSPX (S&P 500) nas mesmas janelas. excess_total = Σ peso × (tema − CSPX), em p.p. da
+    carteira inteira: quanto os temas somaram/tiraram vs. ter esse capital no S&P 500."""
+    th = [e for e in etfs if e.get("since_entry") is not None]
+    tw = sum(e["weight"] for e in th)
+    avg = sum(e["weight"] * e["since_entry"] for e in th) / tw
+    avg_cspx = sum(e["weight"] * e["cspx_since_entry"] for e in th) / tw
+    excess_total = sum(e["weight"] / 100 * (e["since_entry"] - e["cspx_since_entry"]) for e in th)
+    return {"weight": tw, "avg": avg, "avg_cspx": avg_cspx, "diff": avg - avg_cspx,
+            "excess_total": excess_total, "n": len(th)}
+
+
 def build_calendar(etfs):
     """Retorno total em USD por ano-calendário (2026 = YTD até REF_DATE) + USD/BRL."""
     by_key = {e["key"]: e for e in etfs}
@@ -695,7 +708,7 @@ def main():
         "reference_date": REF_DATE, "mo_end_date": MO_END_DATE, "holdings_date": HOLDINGS_DATE,
         "source": "Morningstar MCP (Data Tool, Fund Holdings, X-Ray) · câmbio: fontes públicas 29/09/2026",
         "fx_per_usd": FX_PER_USD,
-        "etfs": etfs, "portfolio": port, "calendar": calendar, "xray": XRAY,
+        "etfs": etfs, "portfolio": port, "entry_summary": build_entry_summary(etfs), "calendar": calendar, "xray": XRAY,
         "top10": top10, "lookthrough": look, "lookthrough_top10": agg10,
     }
     with open(OUT, "w", encoding="utf-8") as f:
