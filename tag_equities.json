@@ -59,7 +59,10 @@
       "inception": "2010-05-19",
       "category": "US Large-Cap Blend Equity",
       "since_inception": null,
-      "vol_note": null
+      "vol_note": null,
+      "entry_date": null,
+      "since_entry": null,
+      "cspx_since_entry": null
     },
     {
       "key": "CIBR",
@@ -106,7 +109,10 @@
       "inception": "2015-07-06",
       "category": "Technology",
       "since_inception": null,
-      "vol_note": null
+      "vol_note": null,
+      "entry_date": "2025-09-01",
+      "since_entry": 39.7072,
+      "cspx_since_entry": 20.15
     },
     {
       "key": "BKCH",
@@ -152,7 +158,10 @@
       "inception": "2021-07-12",
       "category": "Equity Digital Assets",
       "since_inception": null,
-      "vol_note": null
+      "vol_note": null,
+      "entry_date": "2026-01-07",
+      "since_entry": -0.8387,
+      "cspx_since_entry": 11.7557
     },
     {
       "key": "BRIJ",
@@ -199,7 +208,10 @@
       "inception": "2024-09-03",
       "category": "Sector Equity Infrastructure",
       "since_inception": 17.8814,
-      "vol_note": null
+      "vol_note": null,
+      "entry_date": "2026-01-07",
+      "since_entry": -7.2696,
+      "cspx_since_entry": 11.7557
     },
     {
       "key": "SOXQ",
@@ -246,7 +258,10 @@
       "inception": "2021-06-11",
       "category": "Technology",
       "since_inception": null,
-      "vol_note": null
+      "vol_note": null,
+      "entry_date": "2026-08-03",
+      "since_entry": 9.1194,
+      "cspx_since_entry": 1.2476
     },
     {
       "key": "DRAM",
@@ -290,7 +305,10 @@
       "inception": "2026-04-01",
       "category": "Technology",
       "since_inception": 111.8927,
-      "vol_note": "desde o início (01/04/2026, 123 pregões)"
+      "vol_note": "desde o início (01/04/2026, 123 pregões)",
+      "entry_date": "2026-08-03",
+      "since_entry": 17.2293,
+      "cspx_since_entry": 1.2476
     },
     {
       "key": "GRDU",
@@ -336,7 +354,10 @@
       "inception": "2022-04-14",
       "category": "Sector Equity Infrastructure",
       "since_inception": null,
-      "vol_note": null
+      "vol_note": null,
+      "entry_date": "2026-08-03",
+      "since_entry": -1.8796,
+      "cspx_since_entry": 1.2476
     }
   ],
   "portfolio": {

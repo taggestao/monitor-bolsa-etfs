@@ -220,6 +220,20 @@ MS_ETF = {
                  category="Sector Equity Infrastructure", idx_0831=61.96800, idx_0928=61.86100),
 }
 
+# ── Entrada de cada tema na carteira TAG: Daily Return Index (HS793) no fechamento da data ──
+# Retorno desde a entrada = índice em REF_DATE ÷ índice na data de entrada − 1 (USD, total return).
+# CSPX (núcleo) sem data de entrada informada; CSPX_AT_ENTRY = índice do CSPX nas mesmas datas,
+# para comparar cada tema com o S&P 500 no mesmo período.
+CSPX_AT_ENTRY = {"2025-09-01": 689.77460, "2026-01-07": 741.58540, "2026-08-03": 818.55180}
+ENTRY = {
+    "CIBR": ("2025-09-01", 77.31617),
+    "BKCH": ("2026-01-07", 85.75699),
+    "BRIJ": ("2026-01-07", 23.12044),
+    "SOXQ": ("2026-08-03", 94.15250),
+    "DRAM": ("2026-08-03", 51.04400),
+    "GRDU": ("2026-08-03", 63.04600),
+}
+
 # ── Retorno por ano-calendário: Daily Return Index (HS793) no último dia de cada ano ──
 # (Morningstar; fins de semana/feriados repetem o último pregão). None = ETF ainda não existia.
 # Ano parcial de lançamento (BRIJ 2024, GRDU 2022) fica em branco; DRAM 2026 = desde o início.
@@ -513,6 +527,10 @@ def build_etfs():
             "net_margin": d["net_margin"], "eg_lt": d["eg_lt"], "eg_hist": d["eg_hist"], "ter": d["ter"],
             "n_stocks": d["n_stocks"], "inception": d["inception"], "category": d["category"],
             "since_inception": d.get("since_inception"), "vol_note": None,
+            "entry_date": ENTRY.get(key, (None,))[0],
+            "since_entry": (d["idx_0928"] / ENTRY[key][1] - 1) * 100 if key in ENTRY else None,
+            "cspx_since_entry": (MS_ETF["CSPX"]["idx_0928"] / CSPX_AT_ENTRY[ENTRY[key][0]] - 1) * 100
+                                if key in ENTRY else None,
         }
         if key == "DRAM":
             row["since_inception"] = dram["since_inception"]

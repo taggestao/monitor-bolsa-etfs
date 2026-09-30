@@ -40,6 +40,14 @@ def _ret(v, d=2):
     return f"<span style='color:{c};font-weight:600'>{_pct(v, d)}</span>"
 
 
+def _pp(v, d=1):
+    """Diferença em pontos percentuais, colorida."""
+    if v is None:
+        return f"<span style='color:{TAG_GRAY}'>—</span>"
+    c = TAG_GREEN if v >= 0 else TAG_RED
+    return f"<span style='color:{c};font-weight:600'>{'+' if v >= 0 else ''}{_num(v, d)} p.p.</span>"
+
+
 def _mult(v, d=1):
     return "—" if v is None else _num(v, d, "x")
 
@@ -199,6 +207,24 @@ def render_overview():
         "24M/36M anualizados. Carteira = média dos ETFs pelos pesos atuais, renormalizada para os ETFs com "
         "dado no período (DRAM só existe desde 01/04/2026; BRIJ desde 03/09/2024). "
         "† DRAM: retorno desde o início (01/04/2026). * DRAM: vol anualizada desde o início.")
+
+    # ── Retorno desde a entrada de cada tema na carteira ──
+    _section("🎯 Retorno desde a entrada de cada tema na carteira TAG")
+    from datetime import date
+    ref_d = date.fromisoformat(data["reference_date"])
+    erows = []
+    for e in sorted([e for e in etfs if e.get("entry_date")], key=lambda e: e["entry_date"]):
+        days = (ref_d - date.fromisoformat(e["entry_date"])).days
+        erows.append({"cells": [
+            _pill(e["key"]), e["camada"], _pct(e["weight"], 1), _br_date(e["entry_date"]), _num(days, 0),
+            _ret(e["since_entry"]), _ret(e["cspx_since_entry"]), _pp(e["since_entry"] - e["cspx_since_entry"]),
+        ]})
+    _table(["Tema", "Camada", "Peso", "Entrada", "Dias", "Retorno desde a entrada", "CSPX no período",
+            "Diferença vs. CSPX"], erows, min_width=900)
+    st.caption(
+        "Retorno total em USD do fechamento da data de entrada até "
+        f"{_br_date(data['reference_date'])} (Daily Return Index Morningstar). CSPX no período = S&P 500 (núcleo "
+        "da carteira) entre as mesmas datas; diferença em pontos percentuais. Períodos curtos, sem anualizar.")
 
     # ── Retorno por ano-calendário + USD/BRL ──
     _section("📅 Retorno por ano-calendário (USD) e variação cambial")
