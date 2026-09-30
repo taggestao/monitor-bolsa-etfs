@@ -162,6 +162,25 @@ def render_overview():
     ])
     st.markdown(f"<div style='display:flex;gap:6px;overflow-x:auto'>{kpis}</div>", unsafe_allow_html=True)
 
+    # ── Destaque: retorno desde a entrada de cada tema ──
+    themes = sorted([e for e in etfs if e.get("entry_date")], key=lambda e: e["entry_date"])
+    cards = ""
+    for e in themes:
+        r, diff = e["since_entry"], e["since_entry"] - e["cspx_since_entry"]
+        rc = TAG_GREEN if r >= 0 else TAG_RED
+        cards += (
+            f"<div style='background:#fff;border:1px solid rgba(99,13,36,0.15);"
+            f"border-top:4px solid {ETF_COLORS[e['key']]};border-radius:10px;padding:8px 10px;flex:1 1 0;min-width:0'>"
+            f"<div style='display:flex;justify-content:space-between;align-items:center'>{_pill(e['key'])}"
+            f"<span style='font-size:11px;color:{TAG_GRAY}'>desde {_br_date(e['entry_date'])}</span></div>"
+            f"<div style='font-size:1.3rem;font-weight:700;color:{rc};margin-top:4px'>"
+            f"{'+' if r >= 0 else ''}{_pct(r)}</div>"
+            f"<div style='font-size:11px;color:{TAG_GRAY}'>vs. CSPX: {_pp(diff)}</div></div>")
+    st.markdown(
+        f"<div style='margin:14px 0 4px 0;font-size:12px;font-weight:700;color:{TAG_VINHO};"
+        f"text-transform:uppercase;letter-spacing:.4px'>🎯 Retorno desde a entrada de cada tema (USD)</div>"
+        f"<div style='display:flex;gap:6px;overflow-x:auto'>{cards}</div>", unsafe_allow_html=True)
+
     # ── Alocação ──
     _section("🧩 Alocação e camada do ecossistema")
     c1, c2 = st.columns([1, 1.4])
