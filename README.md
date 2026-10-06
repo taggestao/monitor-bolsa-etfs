@@ -31,7 +31,7 @@ streamlit run app.py
    - Branch: `main`
    - Main file path: `app.py`
    - App URL (optional): e.g. `tag-monitor-bolsa`
-4. *Advanced settings* → Python **3.11**. No secrets needed (the data are in `tag_equities.json`).
+4. *Advanced settings* → Python **3.11**. No secrets needed (the app reads `tag_equities.json`).
 5. **Deploy**. Every push to `main` redeploys the app automatically.
 
 Private repo → the app is private by default: share it under *Settings → Sharing* with the TAG
@@ -39,10 +39,12 @@ team's emails (or make it public, if appropriate).
 
 ## Updating the data
 
-The data come from Morningstar (MCP) and are hard-coded in `build_tag_equities.py`
-(dicts `MS_ETF`, `HOLDINGS`, `STOCKS`, `XRAY`, `FX_PER_USD`). After re-collecting them (or changing
-the weights in `PORTFOLIO`), regenerate the JSON the app reads:
+The data come from Morningstar (MCP). Raw values live in `morningstar_data.json`; a daily
+Claude routine with the Morningstar connector refreshes them and pushes to `main`, which
+redeploys the app. See [ATUALIZACAO.md](ATUALIZACAO.md).
 
 ```bash
-python build_tag_equities.py   # → tag_equities.json
+python refresh_morningstar.py --plan      # MCP calls to make
+python refresh_morningstar.py raw/        # apply the saved responses → morningstar_data.json
+python build_tag_equities.py              # → tag_equities.json
 ```

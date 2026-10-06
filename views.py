@@ -119,9 +119,15 @@ def _br_date(iso):
 
 
 @st.cache_data(show_spinner=False)
-def _load():
+def _load_file(mtime):
+    # mtime entra na chave do cache: quando o JSON é atualizado (deploy da rotina diária),
+    # a próxima abertura do app já lê os dados novos.
     with open(_DATA_FILE, encoding="utf-8") as f:
         return json.load(f)
+
+
+def _load():
+    return _load_file(os.path.getmtime(_DATA_FILE))
 
 
 def load_data():
@@ -302,7 +308,7 @@ def render_overview():
         f"renormalizada para os ETFs com ano completo (cobertura — {cov_txt}). "
         "USD/BRL = variação da PTAX venda do Banco Central entre fins de ano "
         f"(R$ {_num(lv['2021'], 4)} → {_num(lv['2022'], 4)} → {_num(lv['2023'], 4)} → {_num(lv['2024'], 4)} → "
-        f"{_num(lv['2025'], 4)} → {_num(lv['ref'], 4)} em {_br_date(data['reference_date'])}); positivo = real "
+        f"{_num(lv['2025'], 4)} → {_num(lv['ref'], 4)} em {_br_date(data.get('usdbrl_ref_date', data['reference_date']))}); positivo = real "
         "desvalorizou. Carteira em BRL = (1 + retorno USD) × (1 + variação USD/BRL) − 1.")
 
     # ── Valuation ──
