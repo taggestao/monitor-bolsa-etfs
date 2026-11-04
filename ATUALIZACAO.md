@@ -8,18 +8,24 @@ fechamento disponível no Morningstar.
 
 ## Passo a passo (é o que a rotina executa)
 
-1. `python refresh_morningstar.py --plan` lista as chamadas ao `morningstar-data-tool`:
+1. `python refresh_morningstar.py --plan` (fase 1) lista as chamadas, cada uma com a ferramenta MCP:
    - `etf_snapshot.json`: snapshot dos 7 ETFs (preço, AUM, retornos, vol, valuation);
    - `etf_index.json`: Daily Return Index (HS793) dos 7 ETFs, do último fim de mês guardado até hoje;
    - `etf_monthly.json`: retorno mensal (HP010) de 6 ETFs (o CSPX não tem HP010; o retorno mensal
      dele sai do HS793);
    - `dram_index.json`: HS793 do DRAM desde o último dia salvo (série desde o lançamento);
-   - `stocks_NN.json`: ações das holdings, 10 por chamada (no máximo ~10 chamadas por segundo,
-     porque o MCP limita a 15 requisições por segundo).
+   - `holdings.json` (Fund Holdings Tool, top 25 de cada ETF): só quando as holdings gravadas têm
+     mais de 7 dias;
+   - `xray_equity_statistics.json` e `xray_equity_sectors.json` (Portfolio Analysis Tool, carteira
+     TAG pelos pesos atuais): só quando fecha um mês que o X-Ray gravado ainda não tem.
 2. Fazer cada chamada e salvar a resposta em `raw/<file>` (fora do repositório). Vale a
-   resposta original (`{"result": ...}`) ou o formato compacto
-   `{"<ms_id>": {"<datapoint>": valor}}` e, para séries, `{"<ms_id>": {"HS793": {"AAAA-MM-DD": valor}}}`.
-   Datapoints ausentes na resposta mantêm o valor anterior.
+   resposta original ou o formato compacto `{"<ms_id>": {"<datapoint>": valor}}` e, para séries,
+   `{"<ms_id>": {"HS793": {"AAAA-MM-DD": valor}}}`. Holdings: original ou
+   `{"_as_of": "AAAA-MM-DD", "<etf_id>": [["<ms_id>", "<nome>", peso], ...]}` (ms_id vazio quando o
+   Morningstar não informa). X-Ray: resposta original. Datapoints ausentes mantêm o valor anterior.
+   Depois, `python refresh_morningstar.py --plan-stocks raw/` (fase 2) lista as chamadas das ações
+   que o app mostra (top 10 de cada ETF e top 25 da look-through, pelas holdings novas se vieram) e
+   do cadastro (ticker, país, setor, moeda) das ações que entraram agora. Salvar em `raw/` também.
 3. `python refresh_morningstar.py raw/` atualiza `morningstar_data.json`. A data de referência
    é o último dia útil com HS793 do CSPX. O script para com erro se faltar ETF, se a série não
    cobrir o fim do mês anterior ou se o histórico do DRAM tiver lacunas.
@@ -44,10 +50,18 @@ retornos mensais do Morningstar em `morningstar_data.json`. Preço, AUM, valuati
 mostram sempre o último pregão coletado. A PTAX da data escolhida é buscada no Banco Central
 quando o app abre.
 
-## Atualização manual (mensal)
+## Holdings: regras de tratamento (carteira.py)
 
-Holdings (`holdings`, top 25 por ETF, Fund Holdings Tool) e X-Ray da carteira (`xray`,
-Portfolio Analysis Tool) mudam pouco e são editados direto em `morningstar_data.json`.
-Ações novas nas holdings precisam de uma entrada em `stocks` (ticker, país, setor, moeda); a
-partir daí a rotina diária passa a atualizá-las. Alocação (`PORTFOLIO`), descritivos
-(`ETF_INFO`) e datas de entrada (`ENTRY`) ficam em `build_tag_equities.py`.
+- Swaps do DRAM vêm sem Morningstar ID e são atribuídos à ação subjacente (Micron, Samsung,
+  SK hynix, CXMT) como exposição econômica.
+- Fundos monetários (ID começando com F), T-Bills e títulos (B) e saldos em moeda contam como caixa.
+- ADR e preferencial são somados à ação principal na look-through e no top 10 do DRAM
+  (`ISSUER_ALIAS`).
+- Ação nova no top 10 de um ETF ou no top 25 da look-through ganha cadastro automático. Ticker no
+  padrão Bloomberg, com sufixo de bolsa; país em português pelo Business Country; setor
+  Morningstar.
+
+## Ajustes manuais
+
+Alocação (`PORTFOLIO`) e regras de holdings ficam em `carteira.py`. Descritivos (`ETF_INFO`) e
+datas de entrada (`ENTRY`) ficam em `build_tag_equities.py`.

@@ -14,23 +14,13 @@ Fontes:
 """
 import datetime as dt, json, math, os
 
+from carteira import ETF_ORDER, ISSUER_ALIAS, ISSUER_NAME, MS_IDS, PORTFOLIO, WEIGHTS, dram_consolidated
 from periods import MonthlySeries, add_months, daily_stats, etf_period, month_end, weighted
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(SCRIPT_DIR, "tag_equities.json")
 
 
-# ── Alocação da carteira de bolsa TAG (%) ──
-PORTFOLIO = [
-    # key,    peso,  Morningstar ID
-    ("CSPX", 50.0, "0P0000SM09"),
-    ("CIBR", 10.0, "F00000VWQP"),
-    ("BKCH", 10.0, "F000016SOI"),
-    ("BRIJ", 10.0, "0P0001TOAU"),
-    ("SOXQ", 6.6, "F000016Y1C"),
-    ("DRAM", 6.6, "F00001TGL6"),
-    ("GRDU", 6.8, "F00001DPBY"),
-]
 
 # ── Descritivo de estratégia + ecossistema (PT-BR) ──
 # "camada" = elo da cadeia de valor de IA / tecnologia em que o ETF se posiciona.
@@ -220,19 +210,10 @@ YEAR_END_INDEX = {
 }
 CAL_YEARS = [2026, 2025, 2024, 2023, 2022]
 
-# Nome consolidado para a look-through (classes de ação / ADR / preferencial → mesma empresa)
-ISSUER_ALIAS = {"0P00012BBI": "0P000002HD"}  # Alphabet C → Alphabet A
-ISSUER_NAME = {
-    "0P000002HD": "Alphabet (A+C)", "0P000003MC": "Micron Technology", "0P0000B2XZ": "Samsung Electronics",
-    "0P0000AZ1B": "SK hynix", "CXMT": "CXMT (ChangXin Memory, via swap)",
-}
 
 # P/E TTM acima de 200x ou negativo = sem significado econômico → exibido como "n.s."
 PE_CAP = 200.0
 
-ETF_ORDER = [k for k, _, _ in PORTFOLIO]
-WEIGHTS = {k: w for k, w, _ in PORTFOLIO}
-MS_IDS = {k: m for k, _, m in PORTFOLIO}
 
 
 def _br(iso):
@@ -332,21 +313,12 @@ def stock_row(ms_id):
 def build_top10():
     top = {}
     for key in ETF_ORDER:
-        rows = []
-        for name, wgt, ms_id in HOLDINGS[key]:
-            if ms_id == "CASH":
-                continue
-            rows.append({"name": name, "weight": wgt, "ms_id": ms_id, **(stock_row(ms_id) or {})})
-        # DRAM: consolida posição direta + swaps na mesma empresa antes de pegar o top 10
+        rows = [r for r in HOLDINGS[key] if r[2] != "CASH"]
+        # DRAM: consolida posição direta + swaps (+ ADR/preferencial) na mesma empresa antes do top 10
         if key == "DRAM":
-            agg = {}
-            for r in rows:
-                k = r["ms_id"]
-                if k not in agg:
-                    agg[k] = dict(r, name=ISSUER_NAME.get(k, r["name"]), weight=0.0)
-                agg[k]["weight"] += r["weight"]
-            rows = sorted(agg.values(), key=lambda r: -r["weight"])
-        top[key] = rows[:10]
+            rows = dram_consolidated(rows)
+        top[key] = [{"name": name, "weight": wgt, "ms_id": ms_id, **(stock_row(ms_id) or {})}
+                    for name, wgt, ms_id in rows[:10]]
     return top
 
 

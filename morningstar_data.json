@@ -1,7 +1,7 @@
 {
  "ref_date": "2026-11-03",
  "mo_end_date": "2026-10-31",
- "holdings_date": "2026-09-28",
+ "holdings_date": "2026-11-03",
  "etf": {
   "CSPX": {
    "price": 817.05,
@@ -1628,972 +1628,1080 @@
    "dy": 0.0416,
    "pfv": null,
    "moat": null
+  },
+  "0P000005EI": {
+   "ticker": "TXN",
+   "country": "EUA",
+   "sector": "Tecnologia",
+   "cur": "USD",
+   "mcap": 285693.259398,
+   "price": 312.49,
+   "r1d": 3.46666,
+   "ytd": 83.4515,
+   "r1y": 97.12003,
+   "pe": 40.53048,
+   "fpe": 27.471648,
+   "pb": 14.891491,
+   "roe": 0.409405,
+   "dy": 0.018497,
+   "pfv": 0.961508,
+   "moat": "Wide"
+  },
+  "0P0000002X": {
+   "ticker": "ASML",
+   "country": "Holanda",
+   "sector": "Tecnologia",
+   "cur": "USD",
+   "mcap": 597376.365745,
+   "price": 1552.14,
+   "r1d": 1.70364,
+   "ytd": 45.94886,
+   "r1y": 46.36475,
+   "pe": 38.19072,
+   "fpe": 24.179018,
+   "pb": 23.827192,
+   "roe": 0.652038,
+   "dy": 0.005997,
+   "pfv": 0.757141,
+   "moat": "Wide"
+  },
+  "0P0001O3VA": {
+   "ticker": "WULF",
+   "country": "EUA",
+   "sector": "Financeiro",
+   "cur": "USD",
+   "mcap": 6252.077523,
+   "price": 12.53,
+   "r1d": 14.53382,
+   "ytd": 9.05135,
+   "r1y": -22.17391,
+   "pe": null,
+   "fpe": 835.333333,
+   "pb": 42.446087,
+   "roe": -15.930321,
+   "dy": 0.0,
+   "pfv": null,
+   "moat": null
+  },
+  "0P000000RD": {
+   "ticker": "BRK/B",
+   "country": "EUA",
+   "sector": "Financeiro",
+   "cur": "USD",
+   "mcap": 1192935.768444,
+   "price": 557.07,
+   "r1d": 0.17263,
+   "ytd": 10.82662,
+   "r1y": 17.11024,
+   "pe": 14.011654,
+   "fpe": 27.137636,
+   "pb": 1.599563,
+   "roe": 0.120947,
+   "dy": 0.0,
+   "pfv": 1.092294,
+   "moat": "Narrow"
+  },
+  "0P0000DLEB": {
+   "ticker": "STR AV",
+   "country": "Áustria",
+   "sector": "Industriais",
+   "cur": "EUR",
+   "mcap": 11821.33207,
+   "price": 102.4,
+   "r1d": -1.72745,
+   "ytd": 30.0,
+   "r1y": 51.94805,
+   "pe": 12.564417,
+   "fpe": null,
+   "pb": 2.162543,
+   "roe": 0.177809,
+   "dy": 0.02832,
+   "pfv": null,
+   "moat": null
+  },
+  "0P0001SB7W": {
+   "ticker": "CORZ",
+   "country": "EUA",
+   "sector": "Tecnologia",
+   "cur": "USD",
+   "mcap": 4575.88788,
+   "price": 14.24,
+   "r1d": 13.87445,
+   "ytd": -2.1978,
+   "r1y": -37.81659,
+   "pe": null,
+   "fpe": 24.135593,
+   "pb": null,
+   "roe": null,
+   "dy": 0.0,
+   "pfv": null,
+   "moat": null
   }
  },
  "holdings": {
   "CSPX": [
    [
-    "NVIDIA Corp",
-    8.14414,
-    "0P000003RE"
-   ],
-   [
     "Apple Inc",
-    7.44336,
+    7.5934,
     "0P000000GY"
    ],
    [
+    "NVIDIA Corp",
+    7.52012,
+    "0P000003RE"
+   ],
+   [
     "Microsoft Corp",
-    5.73164,
+    5.79119,
     "0P000003MH"
    ],
    [
     "Amazon.com Inc",
-    3.66419,
+    3.70788,
     "0P000000B7"
    ],
    [
     "Alphabet Inc Class A",
-    3.01776,
+    2.51772,
     "0P000002HD"
    ],
    [
     "Broadcom Inc",
-    2.50994,
+    2.35766,
     "0P0000KU35"
    ],
    [
     "Meta Platforms Inc Class A",
-    2.47806,
+    2.05759,
     "0P0000W3KZ"
    ],
    [
     "Alphabet Inc Class C",
-    2.42427,
+    2.03247,
     "0P00012BBI"
    ],
    [
-    "Micron Technology Inc",
-    1.82739,
-    "0P000003MC"
-   ],
-   [
     "Tesla Inc",
-    1.56783,
+    1.75024,
     "0P0000OQN8"
    ],
    [
-    "Advanced Micro Devices Inc",
-    1.53912,
-    "0P0000006A"
-   ],
-   [
     "Eli Lilly and Co",
-    1.41579,
+    1.7363,
     "0P000001WJ"
    ],
    [
     "Berkshire Hathaway Inc Class B",
-    1.40759,
+    1.59282,
     "0P000000RD"
    ],
    [
+    "Micron Technology Inc",
+    1.44785,
+    "0P000003MC"
+   ],
+   [
     "JPMorgan Chase & Co",
-    1.36322,
+    1.3923,
     "0P0000031C"
    ],
    [
+    "Advanced Micro Devices Inc",
+    1.17204,
+    "0P0000006A"
+   ],
+   [
     "ExxonMobil Holdings Corp",
-    0.98712,
+    1.13619,
     "0P00000220"
    ],
    [
-    "Johnson & Johnson",
-    0.97716,
-    "0P0000032S"
-   ],
-   [
     "Visa Inc Class A",
-    0.93616,
+    1.11516,
     "0P0000CPCP"
    ],
    [
-    "Intel Corp",
-    0.91374,
-    "0P000002X8"
+    "Johnson & Johnson",
+    1.00275,
+    "0P0000032S"
    ],
    [
     "Walmart Inc",
-    0.7195,
+    0.87515,
     "0P000005UH"
    ],
    [
-    "AbbVie Inc",
-    0.69834,
-    "0P0000XPGW"
-   ],
-   [
     "Mastercard Inc Class A",
-    0.68622,
+    0.81838,
     "0P00005U6B"
    ],
    [
-    "Palantir Technologies Inc",
-    0.65239,
-    "0P0001KOSE"
-   ],
-   [
-    "Cisco Systems Inc",
-    0.62871,
-    "0P0000019Y"
+    "AbbVie Inc",
+    0.78497,
+    "0P0000XPGW"
    ],
    [
     "Costco Wholesale Corp",
-    0.61179,
+    0.70968,
     "0P000001IK"
    ],
    [
     "Chevron Corp",
-    0.60414,
+    0.69209,
     "0P00000185"
+   ],
+   [
+    "Palantir Technologies Inc Class A",
+    0.63102,
+    "0P0001KOSE"
+   ],
+   [
+    "Cisco Systems Inc",
+    0.61592,
+    "0P0000019Y"
+   ],
+   [
+    "Procter & Gamble Co",
+    0.58469,
+    "0P000004GV"
    ]
   ],
   "CIBR": [
    [
     "CrowdStrike Holdings Inc Class A",
-    8.8239,
+    8.70596,
     "0P0001HOOZ"
    ],
    [
-    "Fortinet Inc",
-    8.11076,
-    "0P0000L1GP"
-   ],
-   [
-    "Palo Alto Networks Inc",
-    8.06734,
-    "0P0000WI3J"
-   ],
-   [
     "Cisco Systems Inc",
-    7.59553,
+    7.65982,
     "0P0000019Y"
    ],
    [
+    "Palo Alto Networks Inc",
+    7.53251,
+    "0P0000WI3J"
+   ],
+   [
     "Broadcom Inc",
-    7.42141,
+    7.37115,
     "0P0000KU35"
    ],
    [
-    "Cloudflare Inc",
-    4.56099,
-    "0P0001ID95"
-   ],
-   [
-    "Okta Inc Class A",
-    4.32904,
-    "0P0001A2H3"
+    "Fortinet Inc",
+    6.1602,
+    "0P0000L1GP"
    ],
    [
     "Zscaler Inc",
-    3.64145,
+    4.29733,
     "0P0001CT73"
    ],
    [
-    "F5 Inc",
-    3.57543,
-    "0P00000225"
+    "Okta Inc Class A",
+    4.24568,
+    "0P0001A2H3"
    ],
    [
-    "Rubrik Inc Class A",
-    2.68747,
+    "Cloudflare Inc",
+    3.68549,
+    "0P0001ID95"
+   ],
+   [
+    "Rubrik Inc Class A Shares",
+    2.89441,
     "0P0001SOH2"
    ],
    [
-    "Datadog Inc Class A",
-    2.22819,
-    "0P0001IEZ0"
+    "F5 Inc",
+    2.84167,
+    "0P00000225"
+   ],
+   [
+    "Accenture PLC Class A",
+    2.75663,
+    "0P0000004C"
+   ],
+   [
+    "Gen Digital Inc",
+    2.22202,
+    "0P0000058I"
+   ],
+   [
+    "International Business Machines Corp",
+    2.19682,
+    "0P000002RH"
    ],
    [
     "NetApp Inc",
-    2.1684,
+    2.11564,
     "0P000003UY"
    ],
    [
+    "Microsoft Corp",
+    2.11033,
+    "0P000003MH"
+   ],
+   [
+    "Check Point Software Technologies Ltd",
+    2.04023,
+    "0P0000017H"
+   ],
+   [
+    "Infosys Ltd ADR",
+    2.03266,
+    "0P000002VR"
+   ],
+   [
+    "Leidos Holdings Inc",
+    1.97441,
+    "0P00006F08"
+   ],
+   [
+    "Datadog Inc Class A",
+    1.91172,
+    "0P0001IEZ0"
+   ],
+   [
+    "Thales",
+    1.89288,
+    "0P00009WR9"
+   ],
+   [
+    "JFrog Ltd",
+    1.81699,
+    "0P0001KOMG"
+   ],
+   [
+    "Arista Networks Inc",
+    1.78419,
+    "0P0001354B"
+   ],
+   [
     "Dynatrace Inc",
-    2.08261,
+    1.77023,
     "0P0001I3W4"
    ],
    [
     "Akamai Technologies Inc",
-    2.07675,
+    1.72364,
     "0P0000007V"
    ],
    [
-    "Arista Networks Inc",
-    2.05835,
-    "0P0001354B"
-   ],
-   [
     "Alphabet Inc Class A",
-    1.98522,
+    1.69549,
     "0P000002HD"
-   ],
-   [
-    "Microsoft Corp",
-    1.97309,
-    "0P000003MH"
-   ],
-   [
-    "International Business Machines Corp",
-    1.85463,
-    "0P000002RH"
-   ],
-   [
-    "Accenture PLC Class A",
-    1.80725,
-    "0P0000004C"
-   ],
-   [
-    "Thales",
-    1.78376,
-    "0P00009WR9"
-   ],
-   [
-    "Check Point Software Technologies Ltd",
-    1.77321,
-    "0P0000017H"
-   ],
-   [
-    "JFrog Ltd",
-    1.74441,
-    "0P0001KOMG"
-   ],
-   [
-    "Leidos Holdings Inc",
-    1.71524,
-    "0P00006F08"
-   ],
-   [
-    "Infosys Ltd ADR",
-    1.7146,
-    "0P000002VR"
-   ],
-   [
-    "Gen Digital Inc",
-    1.49167,
-    "0P0000058I"
    ]
   ],
   "BKCH": [
    [
     "Coinbase Global Inc Class A",
-    13.73261,
+    14.62758,
     "0P0001M2C4"
    ],
    [
     "Circle Internet Group Inc Class A",
-    11.06952,
+    13.62767,
     "0P0001V0FO"
    ],
    [
     "BitMine Immersion Technologies Inc",
-    10.53879,
+    11.30793,
     "0P000007QU"
    ],
    [
     "IREN Ltd",
-    10.02159,
+    8.24189,
     "0P0001NS43"
    ],
    [
     "Hut 8 Corp",
-    4.91436,
+    4.7171,
     "0P0001QUQ0"
    ],
    [
     "Galaxy Digital Inc Class A",
-    4.47444,
+    4.55122,
     "0P0000KUS8"
    ],
    [
+    "TeraWulf Inc",
+    4.03568,
+    "0P0001O3VA"
+   ],
+   [
     "Riot Platforms Inc",
-    4.34149,
+    3.94917,
     "0P000000JX"
    ],
    [
+    "Core Scientific Inc",
+    3.9094,
+    "0P0001SB7W"
+   ],
+   [
+    "Applied Digital Corp",
+    3.69877,
+    "0P0000028I"
+   ],
+   [
     "MARA Holdings Inc",
-    4.33296,
+    3.59362,
     "0P0000STDD"
    ],
    [
     "Cleanspark Inc",
-    3.92663,
+    3.36528,
     "0P0000SUUT"
    ],
    [
-    "Applied Digital Corp",
-    3.62733,
-    "0P0000028I"
-   ],
-   [
-    "TeraWulf Inc",
-    3.46771,
-    "0P0001O3VA"
-   ],
-   [
-    "Core Scientific Inc",
-    3.22923,
-    "0P0001SB7W"
-   ],
-   [
-    "Cipher Digital Inc",
-    3.03772,
-    "0P0001N7IB"
+    "Etoro Group Ltd Class A",
+    2.80468,
+    "0P0001UYVI"
    ],
    [
     "Bullish",
-    3.02697,
+    2.71231,
     "0P0001X1C0"
    ],
    [
     "Bitdeer Technologies Group Class A",
-    2.99592,
+    2.63668,
     "0P0001QTHE"
    ],
    [
     "Keel Infrastructure Corp",
-    2.6739,
+    2.29044,
     null
    ],
    [
-    "Etoro Group Ltd Class A",
-    2.28376,
-    "0P0001UYVI"
-   ],
-   [
-    "Bit Digital Inc",
-    1.17892,
-    "0P0001CXJT"
-   ],
-   [
-    "HIVE Digital Technologies Ltd",
-    1.14444,
-    "0P0000Q3W8"
+    "Cipher Digital Inc",
+    2.06706,
+    "0P0001N7IB"
    ],
    [
     "OSL Group Ltd",
-    1.06292,
+    1.49646,
     "0P0000VXNV"
    ],
    [
-    "Canaan Inc ADR",
-    0.79881,
-    "0P0001IRFS"
+    "HIVE Digital Technologies Ltd",
+    0.95785,
+    "0P0000Q3W8"
+   ],
+   [
+    "Bit Digital Inc",
+    0.83368,
+    "0P0001CXJT"
    ],
    [
     "Chaince Digital Holdings Inc",
-    0.55201,
+    0.68021,
     "0P0001QKN1"
    ],
    [
+    "Canaan Inc ADR",
+    0.60116,
+    "0P0001IRFS"
+   ],
+   [
+    "Bitcoin Group SE",
+    0.41406,
+    "0P0001BGMG"
+   ],
+   [
     "Gemini Space Station Inc Class A",
-    0.52093,
+    0.382,
     "0P0001XC85"
    ],
    [
-    "Bakkt Inc Class A",
-    0.37539,
-    "0P0001NKNQ"
-   ],
-   [
-    "Soluna Holdings Inc",
-    0.36157,
-    "0P000003IV"
+    "Neptune Digital Assets Corp",
+    0.34713,
+    "0P0001CKAC"
    ]
   ],
   "BRIJ": [
    [
-    "Thales",
-    8.49625,
-    "0P00009WR9"
-   ],
-   [
-    "Vinci SA",
-    7.90171,
-    "0P00009WSC"
-   ],
-   [
-    "Aena SME SA",
-    7.44972,
-    "0P00015CW1"
-   ],
-   [
-    "Holcim Ltd",
-    7.36224,
-    "0P0000A5DZ"
-   ],
-   [
     "Ferrovial NV",
-    7.31566,
+    8.94339,
     "0P0000AT1J"
    ],
    [
+    "Holcim Ltd",
+    8.54508,
+    "0P0000A5DZ"
+   ],
+   [
+    "Vinci SA",
+    7.70195,
+    "0P00009WSC"
+   ],
+   [
+    "Thales",
+    7.61617,
+    "0P00009WR9"
+   ],
+   [
+    "Aena SME SA",
+    7.57572,
+    "0P00015CW1"
+   ],
+   [
     "Leonardo SpA",
-    5.40036,
+    5.14979,
     "0P00009DKB"
    ],
    [
     "Orsted AS",
-    4.61966,
+    4.77928,
     "0P0001846T"
    ],
    [
     "Verbund AG Class A",
-    3.95136,
+    4.19941,
     "0P0000DLBX"
    ],
    [
     "Telefonica SA",
-    3.45264,
+    3.3491,
     "0P0000A5SI"
    ],
    [
-    "Cellnex Telecom SA",
-    3.11931,
-    "0P00015ZES"
-   ],
-   [
     "STRABAG SE",
-    3.09822,
+    2.8612,
     "0P0000DLEB"
    ],
    [
+    "Cellnex Telecom SA",
+    2.80691,
+    "0P00015ZES"
+   ],
+   [
     "Acciona SA",
-    3.06178,
+    2.64442,
     "0P0000A5S6"
    ],
    [
-    "Telecom Italia SpA",
-    2.88635,
-    "0P00009DOA"
-   ],
-   [
     "Skanska AB Class B",
-    2.55694,
+    2.58758,
     "0P0000A6H2"
    ],
    [
+    "Telecom Italia SpA",
+    2.5432,
+    "0P00009DOA"
+   ],
+   [
     "Eiffage SA",
-    2.54689,
+    2.34125,
     "0P00009WFJ"
    ],
    [
     "Ackermans & Van Haaren NV",
-    2.20037,
+    2.05689,
     "0P0000A5LS"
    ],
    [
     "Aeroports de Paris SA",
-    2.18732,
+    2.05243,
     "0P00009W9W"
    ],
    [
     "Getlink SE",
-    1.86293,
+    1.93949,
     "0P00009WI3"
    ],
    [
     "Buzzi SpA",
-    1.71461,
+    1.75357,
     "0P00009DIE"
    ],
    [
-    "NKT AS",
-    1.62853,
-    "0P0000A5KX"
-   ],
-   [
     "Redeia Corporacion SA",
-    1.4537,
+    1.50273,
     "0P0000A5UI"
    ],
    [
+    "NKT AS",
+    1.49634,
+    "0P0000A5KX"
+   ],
+   [
     "Nexans",
-    1.44589,
+    1.35744,
     "0P00009WMC"
    ],
    [
-    "Flughafen Zuerich AG",
-    1.31312,
-    "0P0000A5DR"
-   ],
-   [
     "Balfour Beatty PLC",
-    1.27231,
+    1.29392,
     "0P000090TX"
    ],
    [
+    "Flughafen Zuerich AG",
+    1.27199,
+    "0P0000A5DR"
+   ],
+   [
     "BKW AG",
-    1.19566,
+    1.2523,
     "0P0000UURC"
    ]
   ],
   "SOXQ": [
    [
     "NVIDIA Corp",
-    11.52754,
+    12.23637,
     "0P000003RE"
    ],
    [
     "Broadcom Inc",
-    8.74731,
+    9.76828,
     "0P0000KU35"
    ],
    [
     "Micron Technology Inc",
-    8.14979,
+    7.77171,
     "0P000003MC"
    ],
    [
-    "Intel Corp",
-    4.8051,
-    "0P000002X8"
-   ],
-   [
-    "Advanced Micro Devices Inc",
-    4.78693,
-    "0P0000006A"
-   ],
-   [
-    "Marvell Technology Inc",
-    4.41163,
-    "0P000003H5"
-   ],
-   [
-    "Qualcomm Inc",
-    4.07653,
-    "0P000004J4"
-   ],
-   [
-    "Analog Devices Inc",
-    4.04766,
-    "0P000000FH"
-   ],
-   [
-    "Taiwan Semiconductor Manufacturing ADR",
-    4.04212,
-    "0P000005AR"
-   ],
-   [
-    "KLA Corp",
-    3.99677,
-    "0P0000033M"
-   ],
-   [
     "Texas Instruments Inc",
-    3.95397,
+    5.21816,
     "0P000005EI"
    ],
    [
-    "Applied Materials Inc",
-    3.93605,
-    "0P000000H9"
+    "Analog Devices Inc",
+    5.05059,
+    "0P000000FH"
+   ],
+   [
+    "Advanced Micro Devices Inc",
+    4.4786,
+    "0P0000006A"
+   ],
+   [
+    "Taiwan Semiconductor Manufacturing Co Ltd ADR",
+    4.24649,
+    "0P000005AR"
+   ],
+   [
+    "Qualcomm Inc",
+    4.20217,
+    "0P000004J4"
    ],
    [
     "ASML Holding NV ADR",
-    3.87167,
+    3.98752,
     "0P0000002X"
    ],
    [
+    "KLA Corp",
+    3.87878,
+    "0P0000033M"
+   ],
+   [
+    "Applied Materials Inc",
+    3.63,
+    "0P000000H9"
+   ],
+   [
+    "Marvell Technology Inc",
+    3.53978,
+    "0P000003H5"
+   ],
+   [
     "Lam Research Corp",
-    3.86648,
+    3.33412,
     "0P00000384"
    ],
    [
-    "Monolithic Power Systems Inc",
-    2.79244,
-    "0P000003OZ"
-   ],
-   [
-    "Teradyne Inc",
-    2.63902,
-    "0P000005DY"
-   ],
-   [
-    "Astera Labs Inc",
-    2.56364,
-    "0P0001SG1A"
-   ],
-   [
     "NXP Semiconductors NV",
-    2.50662,
+    3.27613,
     "0P0000PO4S"
    ],
    [
-    "Coherent Corp",
-    2.3265,
-    "0P000002S3"
+    "Monolithic Power Systems Inc",
+    3.22721,
+    "0P000003OZ"
+   ],
+   [
+    "Intel Corp",
+    2.9472,
+    "0P000002X8"
    ],
    [
     "Microchip Technology Inc",
-    1.78085,
+    2.09124,
     "0P000003M7"
    ],
    [
+    "Teradyne Inc",
+    2.08189,
+    "0P000005DY"
+   ],
+   [
+    "Coherent Corp",
+    2.00885,
+    "0P000002S3"
+   ],
+   [
+    "Astera Labs Inc",
+    2.0037,
+    "0P0001SG1A"
+   ],
+   [
     "ARM Holdings PLC ADR",
-    1.73251,
+    1.45532,
     "0P0001RJKB"
    ],
    [
-    "Credo Technology Group",
-    1.52309,
+    "Credo Technology Group Holding Ltd",
+    1.40214,
     "0P0001OBCD"
    ],
    [
     "ON Semiconductor Corp",
-    1.23883,
+    1.39733,
     "0P0000040N"
    ],
    [
-    "GLOBALFOUNDRIES Inc",
-    1.10275,
-    "0P0001NLO7"
+    "Qnity Electronics Inc",
+    1.22967,
+    "0P0001VS7W"
    ],
    [
-    "Qnity Electronics Inc",
-    1.09914,
-    "0P0001VS7W"
+    "GLOBALFOUNDRIES Inc",
+    1.16348,
+    "0P0001NLO7"
    ]
   ],
   "DRAM": [
    [
     "Samsung Electronics Co Ltd",
-    18.84069,
+    19.17803,
     "0P0000B2XZ"
    ],
    [
-    "Micron Technology Inc (swap)",
-    16.54331,
-    "0P000003MC"
+    "First American Government Obligs X",
+    19.07997,
+    "CASH"
    ],
    [
     "SK hynix Inc",
-    16.52717,
+    16.41628,
     "0P0000AZ1B"
    ],
    [
-    "First American Government Obligs X",
-    15.3101,
+    "Micron Technology (swap)",
+    13.03606,
+    "0P000003MC"
+   ],
+   [
+    "United States Treasury Bills 0%",
+    12.44088,
     "CASH"
    ],
    [
-    "United States Treasury Bills",
-    11.28859,
-    "CASH"
-   ],
-   [
-    "Micron Technology Inc (swap Goldman)",
-    9.82879,
+    "Micron Technology (swap Goldman)",
+    11.23462,
     "0P000003MC"
    ],
    [
     "Samsung Electronics (swap Goldman)",
-    5.94203,
+    7.11305,
     "0P0000B2XZ"
    ],
    [
-    "SK hynix Inc (swap Goldman)",
-    5.28265,
+    "SK hynix (swap Goldman)",
+    6.19013,
     "0P0000AZ1B"
    ],
    [
-    "CXMT Corporation (swap Goldman)",
-    5.17616,
+    "US DOLLARS",
+    6.12522,
+    "CASH"
+   ],
+   [
+    "United States Treasury Bills 0%",
+    5.42973,
+    "CASH"
+   ],
+   [
+    "CXMT (swap Goldman)",
+    4.64294,
     "CXMT"
    ],
    [
-    "SanDisk Corp",
-    4.74385,
-    "0P0001U8JM"
+    "United States Treasury Bills 0%",
+    4.31604,
+    "CASH"
    ],
    [
     "Seagate Technology Holdings PLC",
-    4.66192,
+    3.99194,
     "0P000004VE"
    ],
    [
-    "United States Treasury Bills",
-    3.77045,
-    "CASH"
-   ],
-   [
-    "United States Treasury Bills",
-    3.75106,
-    "CASH"
-   ],
-   [
-    "United States Treasury Bills",
-    3.73435,
-    "CASH"
+    "SanDisk Corp",
+    3.90748,
+    "0P0001U8JM"
    ],
    [
     "Western Digital Corp",
-    3.58813,
+    3.5407,
     "0P000005X1"
    ],
    [
+    "Micron Technology Inc",
+    3.07832,
+    "0P000003MC"
+   ],
+   [
+    "United States Treasury Bill",
+    2.68904,
+    "CASH"
+   ],
+   [
     "Kioxia Holdings Corp",
-    3.26572,
+    2.52593,
     "0P0001KMEE"
    ],
    [
     "Nanya Technology Corp",
-    2.38513,
+    2.46805,
     "0P0000AZD9"
    ],
    [
     "Winbond Electronics Corp",
-    1.08564,
+    1.16807,
     "0P0000BEGR"
    ],
    [
     "GigaDevice Semiconductor Inc Class A",
-    1.02024,
+    0.85372,
     "0P00018JMI"
    ],
    [
     "SK hynix Inc ADR",
-    0.59852,
-    "0P0000AZ1B"
+    0.69804,
+    "0P00035YJ3"
    ],
    [
-    "Micron Technology Inc",
-    0.41672,
-    "0P000003MC"
+    "Samsung Electronics Co Ltd",
+    0.12035,
+    "0P0000D5B8"
    ],
    [
-    "Samsung Electronics Pref",
-    0.11207,
-    "0P0000B2XZ"
-   ],
-   [
-    "Cash Offset",
-    -37.21177,
+    "SOUTH KOREA WON",
+    0.04112,
     "CASH"
    ],
    [
-    "Other assets and liabilities",
-    -0.66643,
-    "CASH"
-   ],
-   [
-    "US Dollars",
-    0.02481,
+    "NEW TAIWAN DOLLAR",
+    0.00334,
     "CASH"
    ]
   ],
   "GRDU": [
    [
     "Johnson Controls International PLC",
-    8.59483,
+    9.12471,
     "0P0000032T"
    ],
    [
-    "Eaton Corp PLC",
-    8.56624,
-    "0P000001UX"
-   ],
-   [
     "Quanta Services Inc",
-    8.4697,
+    8.81037,
     "0P000004JC"
    ],
    [
+    "Eaton Corp PLC",
+    7.84337,
+    "0P000001UX"
+   ],
+   [
     "ABB Ltd",
-    7.82485,
+    7.66407,
     "0P0000A5G8"
    ],
    [
     "Schneider Electric SE",
-    7.69849,
+    6.77449,
     "0P00009WP6"
    ],
    [
-    "Prysmian SpA",
-    3.97975,
-    "0P00009DN8"
-   ],
-   [
     "National Grid PLC",
-    3.75758,
+    4.55906,
     "0P000090S9"
    ],
    [
-    "nVent Electric PLC",
-    3.47915,
-    "0P0001D4SL"
+    "Prysmian SpA",
+    3.84092,
+    "0P00009DN8"
    ],
    [
     "Hubbell Inc",
-    3.00555,
+    3.02043,
     "0P000002Q2"
    ],
    [
+    "nVent Electric PLC",
+    2.89339,
+    "0P0001D4SL"
+   ],
+   [
     "Terna SpA",
-    2.16017,
+    2.39215,
     "0P00009DOD"
    ],
    [
-    "NVIDIA Corp",
-    2.06802,
-    "0P000003RE"
-   ],
-   [
     "Tesla Inc",
-    1.93807,
+    2.36255,
     "0P0000OQN8"
    ],
    [
-    "Cisco Systems Inc",
-    1.92724,
-    "0P0000019Y"
-   ],
-   [
     "Hydro One Ltd",
-    1.68056,
+    2.02137,
     "0P00016YTR"
    ],
    [
-    "HD Hyundai Electric",
-    1.53563,
-    "0P0001AFHI"
+    "Cisco Systems Inc",
+    1.97962,
+    "0P0000019Y"
    ],
    [
-    "LS Electric Co Ltd",
-    1.38926,
-    "0P0000AF2O"
-   ],
-   [
-    "Belimo Holding AG",
-    1.31577,
-    "0P0000A5FI"
-   ],
-   [
-    "Oracle Corp",
-    1.28621,
-    "0P0000043L"
+    "NVIDIA Corp",
+    1.97017,
+    "0P000003RE"
    ],
    [
     "SAP SE",
-    1.2688,
+    1.54303,
     "0P00009QRW"
    ],
    [
     "Texas Instruments Inc",
-    1.25532,
+    1.46995,
     "0P000005EI"
    ],
    [
-    "Equatorial SA",
-    1.24051,
-    "0P0000D6L8"
-   ],
-   [
-    "GE Vernova Inc",
-    1.17787,
-    "0P0001RSOL"
-   ],
-   [
-    "SPIE SA",
-    1.11944,
-    "0P00014D8D"
+    "Belimo Holding AG",
+    1.41797,
+    "0P0000A5FI"
    ],
    [
     "International Business Machines Corp",
-    1.02672,
+    1.26773,
     "0P000002RH"
    ],
    [
-    "NKT AS",
-    1.02187,
-    "0P0000A5KX"
+    "Oracle Corp",
+    1.24782,
+    "0P0000043L"
+   ],
+   [
+    "SPIE SA",
+    1.22282,
+    "0P00014D8D"
+   ],
+   [
+    "LS Electric Co Ltd",
+    1.19577,
+    "0P0000AF2O"
+   ],
+   [
+    "Elia Group SA/NV",
+    1.15888,
+    "0P0000A5OT"
+   ],
+   [
+    "GE Vernova Inc",
+    1.15384,
+    "0P0001RSOL"
+   ],
+   [
+    "Redeia Corporacion SA",
+    1.10541,
+    "0P0000A5UI"
+   ],
+   [
+    "HD Hyundai Electric",
+    1.0844,
+    "0P0001AFHI"
    ]
   ]
  },
  "xray": {
-  "as_of": "2026-08-31",
+  "as_of": "2026-10-31",
   "price_ratios": {
    "portfolio": {
-    "pe": 24.79,
-    "pb": 4.54,
-    "ps": 2.21,
-    "pcf": 16.46
+    "pe": 22.71,
+    "pb": 4.34,
+    "ps": 2.13,
+    "pcf": 14.77
    },
    "benchmark": {
-    "pe": 24.79,
-    "pb": 5.28,
-    "ps": 3.66,
-    "pcf": 19.01
+    "pe": 23.46,
+    "pb": 5.1,
+    "ps": 3.55,
+    "pcf": 16.35
    }
   },
   "profitability": {
    "portfolio": {
-    "roe": 26.96,
-    "roa": 13.97,
-    "net_margin": 23.85,
-    "debt_capital": 32.51
+    "roe": 27.96,
+    "roa": 14.37,
+    "net_margin": 22.98,
+    "debt_capital": 36.35
    },
    "benchmark": {
-    "roe": 37.67,
-    "roa": 19.93,
-    "net_margin": 27.15,
-    "debt_capital": 33.74
+    "roe": 37.84,
+    "roa": 20.02,
+    "net_margin": 25.04,
+    "debt_capital": 39.18
    }
   },
   "sectors": {
    "Tecnologia": [
-    44.21,
-    38.7
+    42.47,
+    38.24
    ],
    "Industriais": [
-    15.76,
-    7.75
+    15.7,
+    7.61
    ],
    "Financeiro": [
-    14.22,
-    12.06
-   ],
-   "Comunicação": [
-    5.99,
-    9.5
+    14.9,
+    12.03
    ],
    "Saúde": [
-    4.75,
-    9.28
+    5.29,
+    10.25
+   ],
+   "Comunicação": [
+    5.15,
+    8.42
    ],
    "Consumo cíclico": [
-    4.66,
-    9.31
+    5.05,
+    9.19
    ],
    "Utilities": [
-    3.23,
-    1.98
+    3.53,
+    2.09
    ],
    "Consumo defensivo": [
-    2.23,
-    4.46
+    2.56,
+    4.88
    ],
    "Materiais básicos": [
-    1.9,
-    1.68
+    2.07,
+    1.58
    ],
    "Energia": [
-    1.73,
-    3.48
+    1.94,
+    3.91
    ],
    "Imobiliário": [
-    1.32,
+    1.34,
     1.8
    ]
   }

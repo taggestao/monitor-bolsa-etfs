@@ -5,22 +5,27 @@ O app (Streamlit Cloud) não acessa o Morningstar MCP diretamente; a coleta é f
 sessão do Claude com o conector Morningstar (rotina diária — ver ATUALIZACAO.md):
 
   1. python refresh_morningstar.py --plan
-       → imprime as chamadas ao morningstar-data-tool necessárias (IDs, datapoints, datas).
-  2. Salvar cada resposta do MCP como um .json em uma pasta (ex.: raw/): a resposta original
-     ({"result": {...}}) ou o formato compacto {ms_id: {datapoint: valor}}, com séries
-     históricas como {ms_id: {"HS793": {"AAAA-MM-DD": valor}}}.
-  3. python refresh_morningstar.py raw/ [--ptax 5.1234 --ptax-date AAAA-MM-DD] [--fx EUR=0.86 ...]
-       → atualiza morningstar_data.json (ETFs, índice diário, DRAM, ações, datas).
-  4. python build_tag_equities.py  → tag_equities.json (lido pelo app).
+       → fase 1: chamadas de ETFs, índice diário e retornos mensais; holdings (Fund Holdings Tool)
+         quando as gravadas têm mais de 7 dias; X-Ray (Portfolio Analysis) quando fecha um mês.
+  2. Salvar cada resposta do MCP como um .json numa pasta (ex.: raw/), com o nome indicado: a
+     resposta original ou o formato compacto {ms_id: {datapoint: valor}}, com séries históricas
+     como {ms_id: {"HS793": {"AAAA-MM-DD": valor}}}. Holdings: original ou
+     {"_as_of": data, "<etf_id>": [[ms_id, nome, peso], ...]}. X-Ray: resposta original.
+  3. python refresh_morningstar.py --plan-stocks raw/
+       → fase 2: chamadas das ações que o app mostra (pelas holdings novas, se vieram) e do cadastro
+         (ticker, país, setor, moeda) das ações que entraram agora.
+  4. python refresh_morningstar.py raw/  → atualiza morningstar_data.json.
+  5. python build_tag_equities.py  → tag_equities.json (lido pelo app).
 
-Também atualiza os retornos mensais (HP010; CSPX pelo HS793) que alimentam o seletor de
+Também grava o retorno de cada mês que fecha (HP010; CSPX pelo HS793), base do seletor de
 fechamento mensal do app, e busca o câmbio: PTAX e EUR/GBP/CHF/DKK/JPY no Banco Central;
 KRW/TWD/CNY na currency-api.
-Holdings e X-Ray mudam pouco (mensal) e continuam sendo atualizados à parte.
 """
 import argparse, calendar, datetime as dt, glob, json, os, sys, urllib.request
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_DIR)
+from carteira import PORTFOLIO, classify_holding, needed_stock_ids  # noqa: E402
 DATA_FILE = os.path.join(SCRIPT_DIR, "morningstar_data.json")
 
 ETF_IDS = {
@@ -44,6 +49,36 @@ STOCK_DATAPOINTS = {
 RETURN_INDEX = "HS793"   # Daily Return Index (série diária, inclui fins de semana)
 MONTHLY_RETURN = "HP010"  # Monthly Return (%) — CSPX não tem: usa a variação mensal do HS793
 STOCK_BATCH = 10
+# Dados cadastrais de ações novas nas holdings (ticker, país, setor, moeda)
+META_DATAPOINTS = {"ticker": "OS385", "country": "BC001", "exchange": "OS01V", "sector": "LA03Z", "cur": "LS05M"}
+HOLDINGS_MAX_AGE = 7   # dias: holdings mais velhas que isso entram no --plan
+N_HOLDINGS = 25
+SECTOR_PT = {
+    "Technology": "Tecnologia", "Industrials": "Industriais", "Financial Services": "Financeiro",
+    "Communication Services": "Comunicação", "Healthcare": "Saúde", "Consumer Cyclical": "Consumo cíclico",
+    "Utilities": "Utilities", "Consumer Defensive": "Consumo defensivo", "Basic Materials": "Materiais básicos",
+    "Energy": "Energia", "Real Estate": "Imobiliário",
+}
+XRAY_SECTOR_PT = {
+    "technology": "Tecnologia", "industrials": "Industriais", "financial_services": "Financeiro",
+    "communication_services": "Comunicação", "healthcare": "Saúde", "consumer_cyclical": "Consumo cíclico",
+    "utilities": "Utilities", "consumer_defensive": "Consumo defensivo", "basic_materials": "Materiais básicos",
+    "energy": "Energia", "real_estate": "Imobiliário",
+}
+COUNTRY_PT = {
+    "USA": "EUA", "FRA": "França", "ESP": "Espanha", "CHE": "Suíça", "NLD": "Holanda", "ITA": "Itália",
+    "DNK": "Dinamarca", "AUT": "Áustria", "GBR": "Reino Unido", "KOR": "Coreia do Sul", "JPN": "Japão",
+    "TWN": "Taiwan", "CHN": "China", "AUS": "Austrália", "DEU": "Alemanha", "CAN": "Canadá", "IRL": "Irlanda",
+    "HKG": "Hong Kong", "SWE": "Suécia", "NOR": "Noruega", "FIN": "Finlândia", "BEL": "Bélgica",
+    "PRT": "Portugal", "ISR": "Israel", "SGP": "Singapura", "IND": "Índia", "BRA": "Brasil",
+    "LUX": "Luxemburgo", "BMU": "Bermudas", "CYM": "Ilhas Cayman", "JEY": "Jersey", "POL": "Polônia",
+}
+# sufixo de bolsa (estilo Bloomberg) pelo país de listagem; EUA sem sufixo
+EXCHANGE_SUFFIX = {
+    "FRA": "FP", "ESP": "SM", "CHE": "SW", "NLD": "NA", "ITA": "IM", "DNK": "DC", "AUT": "AV", "GBR": "LN",
+    "KOR": "KS", "JPN": "JP", "TWN": "TT", "CHN": "CH", "AUS": "AU", "DEU": "GY", "CAN": "CN", "IRL": "ID",
+    "HKG": "HK", "SWE": "SS", "NOR": "NO", "FIN": "FH", "BEL": "BB", "PRT": "PL", "ISR": "IT", "SGP": "SP",
+}
 BCB_PTAX = "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
 BCB_FX = ("EUR", "GBP", "CHF", "DKK", "JPY")   # moedas das ações cobertas pela PTAX do BCB
 # KRW, TWD e CNY não têm PTAX: vêm da currency-api (fawazahmed0, cotações diárias por data), com espelho
@@ -101,12 +136,16 @@ def _num(v):
         return None
 
 
+def _xray_portfolio():
+    return [{"morningstar_id": m, "weight": w} for _, w, m in PORTFOLIO]
+
+
 def plan(data):
+    """Fase 1: ETFs, índice diário, retornos mensais e, quando vencidos, holdings e X-Ray."""
     today = dt.date.today()
     mo_end = _month_end_before(today - dt.timedelta(days=1))
     dram_last = max(data["dram_return_index"])
     last_month = min(mo_end.isoformat(), max(data["monthly_returns"]["CSPX"]))
-    stocks = sorted(data["stocks"])
     calls = [
         {"file": "etf_snapshot.json", "investment_ids": list(ETF_IDS.values()),
          "datapoint_ids": list(ETF_DATAPOINTS.values())},
@@ -118,18 +157,95 @@ def plan(data):
         {"file": "dram_index.json", "investment_ids": [ETF_IDS["DRAM"]], "datapoint_ids": [RETURN_INDEX],
          "start_date": dram_last, "end_date": today.isoformat()},
     ]
-    for i in range(0, len(stocks), STOCK_BATCH):
-        calls.append({"file": f"stocks_{i // STOCK_BATCH + 1:02d}.json",
-                      "investment_ids": stocks[i:i + STOCK_BATCH],
-                      "datapoint_ids": list(STOCK_DATAPOINTS.values())})
+    for c in calls:
+        c["tool"] = "morningstar-data-tool"
+    if (today - dt.date.fromisoformat(data["holdings_date"])).days > HOLDINGS_MAX_AGE:
+        calls.append({"file": "holdings.json", "tool": "morningstar-fund-holdings-tool",
+                      "investment_ids": list(ETF_IDS.values()), "num_holdings": N_HOLDINGS})
+    if data["xray"]["as_of"] < mo_end.isoformat():
+        for t in ("equity_statistics", "equity_sectors"):
+            calls.append({"file": f"xray_{t}.json", "tool": "morningstar-portfolio-analysis-tool",
+                          "analysis_type": t, "portfolio": _xray_portfolio()})
     print(json.dumps(calls, indent=1))
+
+
+def plan_stocks(data, raw_dir):
+    """Fase 2: ações que o app mostra, pelas holdings novas (raw_dir/holdings.json) ou gravadas."""
+    holdings = load_holdings(raw_dir)[0] or {k: [tuple(h) for h in v] for k, v in data["holdings"].items()}
+    need = needed_stock_ids(holdings)
+    calls = []
+    for i in range(0, len(need), STOCK_BATCH):
+        calls.append({"file": f"stocks_{i // STOCK_BATCH + 1:02d}.json", "tool": "morningstar-data-tool",
+                      "investment_ids": need[i:i + STOCK_BATCH], "datapoint_ids": list(STOCK_DATAPOINTS.values())})
+    new = [i for i in need if i not in data["stocks"]]
+    for i in range(0, len(new), STOCK_BATCH):
+        calls.append({"file": f"stock_meta_{i // STOCK_BATCH + 1:02d}.json", "tool": "morningstar-data-tool",
+                      "investment_ids": new[i:i + STOCK_BATCH], "datapoint_ids": list(META_DATAPOINTS.values())})
+    print(json.dumps(calls, indent=1))
+
+
+def load_holdings(raw_dir):
+    """raw_dir/holdings.json → ({key: [(nome, peso, ms_id)]}, data). Aceita a resposta original do
+    Fund Holdings Tool ou o formato compacto {"_as_of": data, "<etf_id>": [[ms_id, nome, peso], ...]}."""
+    fn = os.path.join(raw_dir, "holdings.json")
+    if not os.path.exists(fn):
+        return None, None
+    with open(fn, encoding="utf-8") as f:
+        resp = json.load(f)
+    raw, as_of = {}, []
+    if "results" in resp:
+        for r in resp["results"]:
+            as_of.append(r.get("as_of_date"))
+            for ms_id, rows in r["holdings"].items():
+                raw[ms_id] = [(h.get("morningstar_id") or "", h["holding_name"], float(h["holding_weight"]))
+                              for h in rows]
+    else:
+        as_of.append(resp.get("_as_of"))
+        raw = {k: [(m or "", n, float(w)) for m, n, w in v] for k, v in resp.items() if not k.startswith("_")}
+    by_id = {m: k for k, m in ETF_IDS.items()}
+    out = {by_id[m]: [classify_holding(*h) for h in rows[:N_HOLDINGS]] for m, rows in raw.items() if m in by_id}
+    missing = [k for k in ETF_IDS if k not in out or not out[k]]
+    if missing:
+        sys.exit(f"holdings.json sem holdings de {', '.join(missing)}.")
+    return out, max(d for d in as_of if d)
+
+
+def load_xray(raw_dir):
+    files = {t: os.path.join(raw_dir, f"xray_{t}.json") for t in ("equity_statistics", "equity_sectors")}
+    if not all(os.path.exists(f) for f in files.values()):
+        return None
+    an = {}
+    for f in files.values():
+        with open(f, encoding="utf-8") as fh:
+            an.update(json.load(fh)["xray_response"]["analysis"])
+    pr, pf, sec = an["price_ratios"], an["profitability"], an["equity_sectors"]
+    ratios = lambda d: {"pe": round(d["price_earnings"], 2), "pb": round(d["price_book"], 2),
+                        "ps": round(d["price_sales"], 2), "pcf": round(d["price_cash_flow"], 2)}
+    prof = lambda d: {"roe": round(d["roe"], 2), "roa": round(d["roa"], 2),
+                      "net_margin": round(d["net_margin"], 2), "debt_capital": round(d["debt_capital"], 2)}
+    sectors = {pt: [round(sec["portfolio"][k], 2), round(sec["benchmark"][k], 2)] for k, pt in XRAY_SECTOR_PT.items()}
+    return {"as_of": pr["as_of_date"],
+            "price_ratios": {"portfolio": ratios(pr["portfolio"]), "benchmark": ratios(pr["benchmark"])},
+            "profitability": {"portfolio": prof(pf["portfolio"]), "benchmark": prof(pf["benchmark"])},
+            "sectors": dict(sorted(sectors.items(), key=lambda kv: -kv[1][0]))}
+
+
+def stock_meta(s):
+    """Snapshot com META_DATAPOINTS → cadastro da ação no formato de morningstar_data.json."""
+    cty, exch = s.get("BC001"), s.get("OS01V")
+    ticker = (s.get("OS385") or "").replace(".", "/")
+    if exch and exch != "USA" and EXCHANGE_SUFFIX.get(exch):
+        ticker = f"{ticker} {EXCHANGE_SUFFIX[exch]}"
+    return {"ticker": ticker, "country": COUNTRY_PT.get(cty, cty), "sector": SECTOR_PT.get(s.get("LA03Z"), s.get("LA03Z")),
+            "cur": s.get("LS05M")}
 
 
 def load_responses(raw_dir):
     """Junta todas as respostas do morningstar-data-tool salvas em raw_dir.
     → snap[ms_id][datapoint] = value/code ; series[ms_id][datapoint][date] = float"""
     snap, series = {}, {}
-    files = sorted(glob.glob(os.path.join(raw_dir, "*.json")))
+    files = sorted(f for f in glob.glob(os.path.join(raw_dir, "*.json"))
+                   if not os.path.basename(f).startswith(("holdings", "xray_")))
     if not files:
         sys.exit(f"Nenhum .json em {raw_dir}")
     for fn in files:
@@ -153,7 +269,8 @@ def load_responses(raw_dir):
                         if _num(p.get("value")) is not None:
                             s[p["date"]] = float(p["value"])
                 else:
-                    snap.setdefault(ms_id, {})[dp] = v.get("code") if dp == "LT181" else v.get("value")
+                    code_dps = ("LT181", "BC001", "OS01V", "LS05M")
+                    snap.setdefault(ms_id, {})[dp] = v.get("code") if dp in code_dps else v.get("value")
     return snap, series
 
 
@@ -201,6 +318,23 @@ def apply(data, snap, series, args):
     if gaps or days[-1] != ref:
         sys.exit(f"Série do DRAM incompleta (lacunas em {gaps[:3]}, último dia {days[-1]}, ref {ref}).")
 
+    # ── Holdings e X-Ray (quando vieram nesta rodada) ──
+    holdings, h_date = load_holdings(args.raw_dir)
+    if holdings:
+        data["holdings"] = {k: [list(h) for h in v] for k, v in holdings.items()}
+        data["holdings_date"] = h_date
+        log.append(f"Holdings atualizadas em {h_date} (top {N_HOLDINGS} de cada ETF)")
+    xray = load_xray(args.raw_dir)
+    if xray:
+        data["xray"] = xray
+        log.append(f"X-Ray atualizado: portfólio de {xray['as_of']}, P/E {xray['price_ratios']['portfolio']['pe']}")
+
+    # ── Cadastro de ações novas nas holdings (ticker, país, setor, moeda) ──
+    for ms_id, s in snap.items():
+        if ms_id not in data["stocks"] and s.get("OS385"):
+            data["stocks"][ms_id] = {**stock_meta(s), **{f: None for f in STOCK_DATAPOINTS}}
+            log.append(f"Ação nova: {data['stocks'][ms_id]['ticker']} ({ms_id})")
+
     # ── Ações ──
     updated, missing = 0, []
     for ms_id, st in data["stocks"].items():
@@ -213,9 +347,15 @@ def apply(data, snap, series, args):
             if v is not None:   # datapoint ausente na resposta → mantém o valor anterior
                 st[field] = v
         updated += 1
-    log.append(f"Ações atualizadas: {updated}/{len(data['stocks'])}")
-    if missing:
-        log.append("  sem dados novos (mantidos os anteriores): " + ", ".join(missing))
+    need = needed_stock_ids({k: [tuple(h) for h in v] for k, v in data["holdings"].items()})
+    log.append(f"Ações atualizadas: {updated} ({len(need)} exibidas no app)")
+    stale = [m for m in missing if m.split("(")[-1].rstrip(")") in need]
+    if stale:
+        log.append("  ATENÇÃO, sem dados novos (mantidos os anteriores): " + ", ".join(stale))
+    no_data = [i for i in need if i not in data["stocks"] or data["stocks"][i].get("price") is None]
+    if no_data:
+        log.append("  ATENÇÃO, ações exibidas sem dados (rode --plan-stocks e as chamadas listadas): "
+                   + ", ".join(no_data))
 
     # ── Retornos mensais (seletor de fechamento do app) ──
     added = []
@@ -286,7 +426,9 @@ def apply(data, snap, series, args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("raw_dir", nargs="?", help="pasta com as respostas do morningstar-data-tool (.json)")
-    ap.add_argument("--plan", action="store_true", help="lista as chamadas ao MCP necessárias")
+    ap.add_argument("--plan", action="store_true", help="fase 1: chamadas ao MCP de ETFs, holdings e X-Ray")
+    ap.add_argument("--plan-stocks", action="store_true",
+                    help="fase 2: chamadas das ações exibidas (lê raw_dir/holdings.json, se houver)")
     ap.add_argument("--ptax", type=float, help="PTAX venda USD/BRL mais recente")
     ap.add_argument("--ptax-date", help="data da PTAX (AAAA-MM-DD)")
     ap.add_argument("--fx", nargs="*", help="moeda local por 1 USD, ex.: EUR=0.8612 KRW=1362.5")
@@ -299,6 +441,10 @@ def main():
         data = json.load(f)
     if args.plan:
         return plan(data)
+    if args.plan_stocks:
+        if not args.raw_dir:
+            ap.error("--plan-stocks precisa de raw_dir")
+        return plan_stocks(data, args.raw_dir)
     if not args.raw_dir:
         ap.error("informe raw_dir ou --plan")
     snap, series = load_responses(args.raw_dir)
