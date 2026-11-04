@@ -12,7 +12,9 @@ Fontes:
   • USD/BRL — PTAX venda do Banco Central no fim de cada ano e na data mais recente coletada.
   • Câmbio (para converter market cap de ações fora dos EUA em USD) — cotações públicas.
 """
-import json, math, os
+import datetime as dt, json, math, os
+
+from periods import MonthlySeries, add_months, daily_stats, etf_period, month_end, weighted
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(SCRIPT_DIR, "tag_equities.json")
@@ -233,6 +235,10 @@ WEIGHTS = {k: w for k, w, _ in PORTFOLIO}
 MS_IDS = {k: m for k, _, m in PORTFOLIO}
 
 
+def _br(iso):
+    return "/".join(reversed(iso.split("-")))
+
+
 def _r(x, n=2):
     return None if x is None else round(x, n)
 
@@ -423,6 +429,80 @@ def build_calendar(etfs):
             "portfolio_brl": port_brl}
 
 
+# ── Fechamentos mensais (seletor de data do app) ──
+FIRST_PERIOD = "2022-01-31"   # primeiro fim de mês selecionável
+
+
+def build_period(m, series, dram_launch):
+    """Retornos de cada ETF, da carteira, desde a entrada e por ano-calendário no fim do mês m."""
+    md = m.isoformat()
+    etfs = {}
+    for key in ETF_ORDER:
+        s = series[key]
+        row = etf_period(s, m)
+        row.update({"vol_note": None, "since_inception": None, "since_entry": None, "cspx_since_entry": None})
+        if key == "DRAM" and m >= dram_launch:
+            si, vol, n = daily_stats(MS["dram_return_index"], m)
+            row.update({"since_inception": si, "vol1y": vol,
+                        "vol_note": f"desde o início (01/04/2026, {n} pregões)"})
+        if key in ENTRY and md >= ENTRY[key][0]:
+            idx, cidx = s.index(m), series["CSPX"].index(m)
+            if idx is not None:
+                row["since_entry"] = (idx / ENTRY[key][1] - 1) * 100
+                row["cspx_since_entry"] = (cidx / CSPX_AT_ENTRY[ENTRY[key][0]] - 1) * 100
+        etfs[key] = row
+
+    w = {k: WEIGHTS[k] / 100 for k in ETF_ORDER}
+    port = {}
+    for f in ("mtd", "r3m", "ytd", "r1y", "r2y", "r3y"):
+        v, cov = weighted([(w[k], etfs[k][f]) for k in ETF_ORDER])
+        port[f], port[f + "_cov"] = v, cov * 100
+
+    th = [k for k in ETF_ORDER if etfs[k]["since_entry"] is not None]
+    entry = None
+    if th:
+        tw = sum(WEIGHTS[k] for k in th)
+        avg = sum(WEIGHTS[k] * etfs[k]["since_entry"] for k in th) / tw
+        avg_c = sum(WEIGHTS[k] * etfs[k]["cspx_since_entry"] for k in th) / tw
+        entry = {"weight": tw, "avg": avg, "avg_cspx": avg_c, "diff": avg - avg_c, "n": len(th),
+                 "excess_total": sum(WEIGHTS[k] / 100 * (etfs[k]["since_entry"] - etfs[k]["cspx_since_entry"])
+                                     for k in th)}
+
+    years = [m.year - i for i in range(5)]
+    rows = []
+    for key in ETF_ORDER:
+        s, rets, flags = series[key], {}, {}
+        for y in years:
+            end = m if y == m.year else month_end(y, 12)
+            c = s.cum(month_end(y - 1, 12), end)
+            rets[y] = None if c is None else c * 100
+        if key == "DRAM" and m.year == 2026 and m >= dram_launch:
+            rets[2026], flags[2026] = etfs["DRAM"]["since_inception"], "desde 01/04/2026"
+        rows.append({"key": key, "weight": WEIGHTS[key], "returns": rets, "flags": flags})
+    cal_port, cal_cov = {}, {}
+    for y in years:
+        v, cov = weighted([(r["weight"], r["returns"][y]) for r in rows if not r["flags"].get(y)])
+        cal_port[y], cal_cov[y] = v, cov
+    return {"etfs": etfs, "portfolio": port, "entry_summary": entry,
+            "calendar": {"years": years, "rows": rows, "portfolio": cal_port, "portfolio_cov": cal_cov}}
+
+
+def build_periods():
+    series = {k: MonthlySeries(MS["monthly_returns"][k], MO_END_DATE, MS_ETF[k]["idx_mo_end"]) for k in ETF_ORDER}
+    # DRAM: abril/2026 (mês de lançamento) vem da série diária, do lançamento ao fim do mês
+    dram_days = MS["dram_return_index"]
+    first = min(dram_days)
+    dram_launch = dt.date.fromisoformat(first)
+    apr = month_end(dram_launch.year, dram_launch.month)
+    series["DRAM"].r.setdefault(apr, (dram_days[apr.isoformat()] / dram_days[first] - 1) * 100)
+    last = dt.date.fromisoformat(MO_END_DATE)
+    out, m = {}, dt.date.fromisoformat(FIRST_PERIOD)
+    while m <= last:
+        out[m.isoformat()] = build_period(m, series, dram_launch)
+        m = add_months(m, 1)
+    return out
+
+
 def main():
     etfs = build_etfs()
     port = build_portfolio(etfs)
@@ -442,11 +522,14 @@ def main():
     data = {
         "title": "Monitor de ETFs — Carteira de Bolsa TAG (Ecossistema AI)",
         "reference_date": REF_DATE, "mo_end_date": MO_END_DATE, "holdings_date": HOLDINGS_DATE,
-        "source": f"Morningstar MCP (Data Tool, Fund Holdings, X-Ray) · câmbio: fontes públicas "
-                  f"{'/'.join(reversed(MS['fx_date'].split('-')))}",
+        "source": f"Morningstar MCP (Data Tool, Fund Holdings, X-Ray) · câmbio: PTAX/BCB "
+                  f"{_br(MS['fx_date'])}; {'/'.join(MS['fx_manual']['currencies'])}: fontes públicas "
+                  f"{_br(MS['fx_manual']['date'])}",
         "fx_per_usd": FX_PER_USD, "fx_date": MS["fx_date"], "usdbrl_ref_date": MS["usdbrl_ptax_ref_date"],
+        "usdbrl_ref": USDBRL_PTAX["ref"], "usdbrl_year_end": {str(k): v for k, v in USDBRL_PTAX.items() if k != "ref"},
         "etfs": etfs, "portfolio": port, "entry_summary": build_entry_summary(etfs), "calendar": calendar, "xray": XRAY,
         "top10": top10, "lookthrough": look, "lookthrough_top10": agg10,
+        "periods": build_periods(), "default_period": MO_END_DATE,
     }
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(clean(data), f, ensure_ascii=False, indent=2)

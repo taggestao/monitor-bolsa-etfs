@@ -13,9 +13,11 @@ sessão do Claude com o conector Morningstar (rotina diária — ver ATUALIZACAO
        → atualiza morningstar_data.json (ETFs, índice diário, DRAM, ações, datas).
   4. python build_tag_equities.py  → tag_equities.json (lido pelo app).
 
+Também atualiza os retornos mensais (HP010; CSPX pelo HS793) que alimentam o seletor de
+fechamento mensal do app, e busca no Banco Central a PTAX e o câmbio de EUR, GBP, CHF, DKK e JPY.
 Holdings e X-Ray mudam pouco (mensal) e continuam sendo atualizados à parte.
 """
-import argparse, calendar, datetime as dt, glob, json, os, sys
+import argparse, calendar, datetime as dt, glob, json, os, sys, urllib.request
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(SCRIPT_DIR, "morningstar_data.json")
@@ -39,12 +41,37 @@ STOCK_DATAPOINTS = {
     "moat": "LT181",
 }
 RETURN_INDEX = "HS793"   # Daily Return Index (série diária, inclui fins de semana)
+MONTHLY_RETURN = "HP010"  # Monthly Return (%) — CSPX não tem: usa a variação mensal do HS793
 STOCK_BATCH = 10
+BCB_PTAX = "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+BCB_FX = ("EUR", "GBP", "CHF", "DKK", "JPY")   # moedas das ações cobertas pela PTAX do BCB
 
 
 def _month_end_before(d):
     first = d.replace(day=1)
     return first - dt.timedelta(days=1)
+
+
+def _month_end_after(d):
+    nxt = (d.replace(day=1) + dt.timedelta(days=32)).replace(day=1)
+    return nxt.replace(day=calendar.monthrange(nxt.year, nxt.month)[1])
+
+
+def bcb_rate(cur, day):
+    """Cotação de venda (R$ por unidade) do boletim de fechamento PTAX no último dia útil até `day`."""
+    d = dt.date.fromisoformat(day)
+    ini, fim = (d - dt.timedelta(days=10)).strftime("%m-%d-%Y"), d.strftime("%m-%d-%Y")
+    if cur == "USD":
+        url = (BCB_PTAX + "CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
+               f"?@dataInicial=%27{ini}%27&@dataFinalCotacao=%27{fim}%27&$format=json")
+    else:
+        url = (BCB_PTAX + "CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,"
+               f"dataFinalCotacao=@dataFinalCotacao)?@moeda=%27{cur}%27&@dataInicial=%27{ini}%27"
+               f"&@dataFinalCotacao=%27{fim}%27&$format=json")
+    with urllib.request.urlopen(url, timeout=15) as r:
+        vals = [v for v in json.load(r)["value"] if v.get("tipoBoletim", "Fechamento") == "Fechamento"]
+    last = max(vals, key=lambda v: v["dataHoraCotacao"])
+    return float(last["cotacaoVenda"]), last["dataHoraCotacao"][:10]
 
 
 def _num(v):
@@ -58,12 +85,16 @@ def plan(data):
     today = dt.date.today()
     mo_end = _month_end_before(today - dt.timedelta(days=1))
     dram_last = max(data["dram_return_index"])
+    last_month = min(mo_end.isoformat(), max(data["monthly_returns"]["CSPX"]))
     stocks = sorted(data["stocks"])
     calls = [
         {"file": "etf_snapshot.json", "investment_ids": list(ETF_IDS.values()),
          "datapoint_ids": list(ETF_DATAPOINTS.values())},
+        # HS793 desde o último fim de mês já guardado: dá o MTD e o retorno mensal do CSPX
         {"file": "etf_index.json", "investment_ids": list(ETF_IDS.values()),
-         "datapoint_ids": [RETURN_INDEX], "start_date": mo_end.isoformat(), "end_date": today.isoformat()},
+         "datapoint_ids": [RETURN_INDEX], "start_date": last_month, "end_date": today.isoformat()},
+        {"file": "etf_monthly.json", "investment_ids": [m for k, m in ETF_IDS.items() if k != "CSPX"],
+         "datapoint_ids": [MONTHLY_RETURN], "start_date": last_month, "end_date": today.isoformat()},
         {"file": "dram_index.json", "investment_ids": [ETF_IDS["DRAM"]], "datapoint_ids": [RETURN_INDEX],
          "start_date": dram_last, "end_date": today.isoformat()},
     ]
@@ -166,7 +197,50 @@ def apply(data, snap, series, args):
     if missing:
         log.append("  sem dados novos (mantidos os anteriores): " + ", ".join(missing))
 
-    # ── Câmbio ──
+    # ── Retornos mensais (seletor de fechamento do app) ──
+    added = []
+    for key, ms_id in ETF_IDS.items():
+        mr = data["monthly_returns"][key]
+        if key == "CSPX":
+            idx = series.get(ms_id, {}).get(RETURN_INDEX, {})
+            m = dt.date.fromisoformat(max(mr))
+            while True:
+                nxt = _month_end_after(m)
+                if nxt.isoformat() > mo_end:
+                    break
+                a, b = _value_at(idx, m.isoformat()), _value_at(idx, nxt.isoformat())
+                if a is None or b is None or m.isoformat() not in idx:
+                    break
+                mr[nxt.isoformat()] = round((b / a - 1) * 100, 5)
+                added.append(f"{key} {nxt.isoformat()}")
+                m = nxt
+        else:
+            for d, v in series.get(ms_id, {}).get(MONTHLY_RETURN, {}).items():
+                if d <= mo_end and d not in mr:
+                    added.append(f"{key} {d}")
+                mr[d] = v
+        data["monthly_returns"][key] = dict(sorted(mr.items()))
+    missing_months = [k for k in ETF_IDS if mo_end not in data["monthly_returns"][k] and
+                      max(data["monthly_returns"][k]) < mo_end]
+    log.append("Retornos mensais novos: " + (", ".join(added) if added else "nenhum"))
+    if missing_months:
+        sys.exit(f"Faltou o retorno mensal de {mo_end} para {', '.join(missing_months)} (etf_monthly.json).")
+
+    # ── Câmbio: PTAX e moedas do BCB automaticamente; --ptax/--fx sobrepõem ──
+    if not args.no_bcb:
+        try:
+            usd, usd_day = bcb_rate("USD", ref)
+            data["usdbrl_ptax"]["ref"], data["usdbrl_ptax_ref_date"] = usd, usd_day
+            fx = {}
+            for cur in BCB_FX:
+                v, _ = bcb_rate(cur, ref)
+                fx[cur] = round(usd / v, 6)
+            data["fx_per_usd"].update(fx)
+            data["fx_date"] = usd_day
+            log.append(f"BCB: PTAX {usd} em {usd_day}; " + ", ".join(f"{k} {v}" for k, v in fx.items())
+                       + " (KRW, TWD e CNY continuam manuais)")
+        except Exception as exc:  # BCB fora do ar ou bloqueado: mantém os valores anteriores
+            log.append(f"BCB indisponível ({exc}); câmbio mantido em {data['fx_date']}")
     if args.ptax:
         data["usdbrl_ptax"]["ref"] = args.ptax
         data["usdbrl_ptax_ref_date"] = args.ptax_date or ref
@@ -191,6 +265,7 @@ def main():
     ap.add_argument("--ptax-date", help="data da PTAX (AAAA-MM-DD)")
     ap.add_argument("--fx", nargs="*", help="moeda local por 1 USD, ex.: EUR=0.8612 KRW=1362.5")
     ap.add_argument("--fx-date", help="data das cotações de --fx (AAAA-MM-DD)")
+    ap.add_argument("--no-bcb", action="store_true", help="não buscar PTAX/câmbio no Banco Central")
     args = ap.parse_args()
 
     with open(DATA_FILE, encoding="utf-8") as f:

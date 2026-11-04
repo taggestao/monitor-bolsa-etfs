@@ -10,7 +10,7 @@ import streamlit as st
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
 from views import (load_data, render_header_note, render_overview, render_strategy,  # noqa: E402
-                   render_top10, render_lookthrough, ETF_COLORS, _br_date, _pct)
+                   render_top10, render_lookthrough, period_options, PERIOD_KEY, ETF_COLORS, _br_date, _pct)
 
 _IMG_DIR = os.path.join(_HERE, "img")
 
@@ -46,14 +46,24 @@ def main():
         }
     </style>""", unsafe_allow_html=True)
 
-    data = load_data()
-
     # ── Sidebar ──
     with st.sidebar:
         try:
             st.image(os.path.join(_IMG_DIR, "logo.png"), width=180)
         except FileNotFoundError:
             st.markdown("<p style='font-size:1.2rem;font-weight:700'>TAG</p>", unsafe_allow_html=True)
+        opts, default = period_options()
+        labels = dict(opts)
+        values = [v for v, _ in opts]
+        if st.session_state.get(PERIOD_KEY) not in labels:
+            st.session_state[PERIOD_KEY] = default if default in labels else values[0]
+        st.selectbox("Data final", values, format_func=labels.get, key=PERIOD_KEY,
+                     help="Fechamento mensal: todos os retornos recalculados até o fim do mês escolhido "
+                          "(retornos mensais Morningstar). Último pregão: dados diários mais recentes.")
+
+    data = load_data()
+
+    with st.sidebar:
         st.markdown("<div style='margin:0.8rem 0 0.3rem 0;font-size:0.75rem;font-weight:600;"
                     "letter-spacing:.5px;opacity:.85'>CARTEIRA DE BOLSA</div>", unsafe_allow_html=True)
         rows = "".join(
@@ -66,7 +76,8 @@ def main():
         st.markdown(rows, unsafe_allow_html=True)
         st.markdown(
             f"<div style='margin-top:1rem;font-size:0.75rem;opacity:.8;line-height:1.5'>"
-            f"Dados até {_br_date(data['reference_date'])}<br>Fonte: Morningstar (MCP)</div>",
+            f"Retornos até {_br_date(data['reference_date'])}<br>Último pregão coletado: "
+            f"{_br_date(data['snapshot_date'])}<br>Fonte: Morningstar (MCP)</div>",
             unsafe_allow_html=True)
 
     # ── Banner ──

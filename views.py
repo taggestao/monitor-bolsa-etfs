@@ -1,8 +1,11 @@
 # views.py — Monitor de Bolsa TAG (ETFs): seções do app (visão geral, estratégia, top 10, look-through).
 # Dados: tag_equities.json, gerado por build_tag_equities.py (Morningstar MCP).
 # =============================================================================
+import copy
 import json
 import os
+import urllib.request
+from datetime import date, timedelta
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -126,24 +129,124 @@ def _load_file(mtime):
         return json.load(f)
 
 
-def _load():
+# Seletor de data final (sidebar): um fechamento mensal (AAAA-MM-DD) ou "diario" (último pregão).
+PERIOD_KEY = "periodo"
+DAILY = "diario"
+_RET_FIELDS = ("mtd", "r3m", "ytd", "r1y", "r2y", "r3y", "vol1y", "vol_note", "since_inception",
+               "since_entry", "cspx_since_entry")
+
+
+def _base():
     return _load_file(os.path.getmtime(_DATA_FILE))
+
+
+def period_options():
+    """[(valor, rótulo)] do seletor: fechamentos mensais (mais recente primeiro) + último pregão."""
+    base = _base()
+    months = sorted(base.get("periods", {}), reverse=True)
+    opts = [(m, f"{_br_date(m)} · fechamento mensal") for m in months]
+    opts.append((DAILY, f"{_br_date(base['reference_date'])} · último pregão"))
+    return opts, base.get("default_period", DAILY)
+
+
+@st.cache_data(show_spinner=False)
+def _period_view(mtime, period):
+    """Dados do app com os retornos recalculados no fechamento mensal `period`."""
+    data = copy.deepcopy(_load_file(mtime))
+    p = data["periods"][period]
+    for e in data["etfs"]:
+        e.update({f: p["etfs"][e["key"]].get(f) for f in _RET_FIELDS})
+        e["r1d"] = None
+    data["portfolio"].update(p["portfolio"])
+    data["portfolio"]["r1d"] = None
+    if p["entry_summary"]:
+        data["entry_summary"] = p["entry_summary"]
+    data["calendar"] = p["calendar"]
+    m = date.fromisoformat(period)
+    data["snapshot_date"] = data["reference_date"]
+    data["reference_date"] = period
+    data["mo_end_date"] = (m.replace(day=1) - timedelta(days=1)).isoformat()
+    data["mode"] = "month"
+    return data
+
+
+def _load():
+    base = _base()
+    sel = st.session_state.get(PERIOD_KEY) or base.get("default_period", DAILY)
+    if sel == DAILY or sel not in base.get("periods", {}):
+        data = dict(base, mode="daily", snapshot_date=base["reference_date"])
+        for e in data["etfs"]:
+            e.setdefault("r3m", None)
+        return data
+    return _period_view(os.path.getmtime(_DATA_FILE), sel)
 
 
 def load_data():
     return _load()
 
 
+# ── PTAX (Banco Central) na data escolhida — busca em tempo de execução, com fallback ──
+@st.cache_data(ttl=6 * 3600, show_spinner=False)
+def _fetch_ptax(day):
+    d = date.fromisoformat(day)
+    ini, fim = (d - timedelta(days=10)).strftime("%m-%d-%Y"), d.strftime("%m-%d-%Y")
+    url = ("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+           "CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
+           f"?@dataInicial=%27{ini}%27&@dataFinalCotacao=%27{fim}%27&$format=json")
+    with urllib.request.urlopen(url, timeout=8) as r:
+        vals = json.load(r)["value"]
+    last = max(vals, key=lambda v: v["dataHoraCotacao"])
+    return float(last["cotacaoVenda"]), last["dataHoraCotacao"][:10]
+
+
+def _ptax(day, fallback=None):
+    """(cotação, data) da PTAX venda no último dia útil até `day`; fallback se o BCB não responder."""
+    try:
+        return _fetch_ptax(day)
+    except Exception:
+        return fallback
+
+
+def _calendar_brl(data):
+    """Variação USD/BRL (PTAX) e carteira em BRL para os anos do calendário."""
+    cal = data["calendar"]
+    ye = {int(k): v for k, v in data["usdbrl_year_end"].items()}
+    ref = data["reference_date"]
+    ref_y = int(ref[:4])
+    fallback = None
+    if data.get("usdbrl_ref_date") and data["usdbrl_ref_date"] <= ref:
+        fallback = (data["usdbrl_ref"], data["usdbrl_ref_date"])
+    if ref[5:] == "12-31" and ref_y in ye:
+        end = (ye[ref_y], ref)
+    else:
+        end = _ptax(ref, fallback)
+    fx, brl = {}, {}
+    for y in cal["years"]:
+        a = ye.get(int(y) - 1)
+        b = end[0] if int(y) == ref_y and end else ye.get(int(y)) if int(y) != ref_y else None
+        fx[y] = None if a is None or b is None else (b / a - 1) * 100
+        pu = cal["portfolio"].get(y) if y in cal["portfolio"] else cal["portfolio"].get(str(y))
+        brl[y] = None if fx[y] is None or pu is None else ((1 + pu / 100) * (1 + fx[y] / 100) - 1) * 100
+    return fx, brl, end, ye
+
+
 def render_header_note():
     data = _load()
     ref = _br_date(data["reference_date"])
     mo_end = _br_date(data["mo_end_date"])
+    snap = _br_date(data["snapshot_date"])
+    if data["mode"] == "month":
+        when = (f"📅 Retornos no <b>fechamento mensal de {ref}</b> (retorno mensal Morningstar); preço, AUM, "
+                f"valuation e ações do último pregão (<b>{snap}</b>); holdings de "
+                f"<b>{_br_date(data['holdings_date'])}</b>. Troque a data final na barra lateral.")
+    else:
+        when = (f"📅 Preços e retornos diários até <b>{ref}</b>; retornos 24M/36M e vol 12M com fechamento "
+                f"mensal de <b>{mo_end}</b>; holdings de <b>{_br_date(data['holdings_date'])}</b>.")
     st.markdown(
         "<p style='font-size:0.85rem;color:#666;margin-bottom:0.8rem'>"
         "Carteira de bolsa TAG — 7 ETFs com foco no ecossistema de IA (compute, memória, energia, "
         "segurança, infraestrutura e cripto/HPC) sobre um núcleo de S&P 500. Dados Morningstar (MCP). "
-        f"📅 Preços e retornos diários até <b>{ref}</b>; retornos 24M/36M e vol 12M com fechamento "
-        f"mensal de <b>{mo_end}</b>; holdings de <b>{_br_date(data['holdings_date'])}</b>.</p>",
+        f"{when}</p>",
         unsafe_allow_html=True,
     )
 
@@ -155,9 +258,11 @@ def render_overview():
     mo_end = _br_date(data["mo_end_date"])
 
     # ── KPIs da carteira ──
+    monthly = data["mode"] == "month"
     kpis = "".join([
-        _kpi("Retorno dia", _pct(port["r1d"]), "média ponderada"),
-        _kpi("MTD", _pct(port["mtd"]), f"desde {mo_end}"),
+        _kpi("3 meses", _pct(port["r3m"]), "média ponderada") if monthly
+        else _kpi("Retorno dia", _pct(port["r1d"]), "média ponderada"),
+        _kpi("Mês" if monthly else "MTD", _pct(port["mtd"]), f"desde {mo_end}"),
         _kpi("YTD", _pct(port["ytd"]), f"{_num(port['ytd_cov'], 0)}% da carteira c/ dado"),
         _kpi("12 meses", _pct(port["r1y"]), f"{_num(port['r1y_cov'], 0)}% da carteira c/ dado"),
         _kpi("P/E TTM", _mult(port["pe"]), f"X-Ray: {_mult(xray['price_ratios']['portfolio']['pe'])}"),
@@ -169,7 +274,8 @@ def render_overview():
     st.markdown(f"<div style='display:flex;gap:6px;overflow-x:auto'>{kpis}</div>", unsafe_allow_html=True)
 
     # ── Destaque: retorno desde a entrada de cada tema ──
-    themes = sorted([e for e in etfs if e.get("entry_date")], key=lambda e: e["entry_date"])
+    themes = sorted([e for e in etfs if e.get("entry_date") and e.get("since_entry") is not None],
+                    key=lambda e: e["entry_date"])
     cards = ""
     for e in themes:
         r, diff = e["since_entry"], e["since_entry"] - e["cspx_since_entry"]
@@ -236,15 +342,19 @@ def render_overview():
         rows.append({"cells": [
             f"{_pill(e['key'])} <span style='color:{TAG_GRAY};font-size:11px'>{e['listing']}</span>",
             _pct(e["weight"], 1), f"{e['cur']} {_num(e['price'])}", _bn(e["aum_usd_bn"]),
-            _bn(e["avg_mcap_usd_bn"]), _ret(e["r1d"]), _ret(e["mtd"]), _ret(e["ytd"]), r1y,
+            _bn(e["avg_mcap_usd_bn"]), _ret(e["r3m"] if monthly else e["r1d"]), _ret(e["mtd"]), _ret(e["ytd"]), r1y,
             _ret(e["r2y"]), _ret(e["r3y"]), vol,
         ]})
     rows.append({"_style": f"background:{TAG_VINHO}0d;font-weight:700", "cells": [
-        "<b>Carteira TAG</b>", "100%", "—", "—", "—", _ret(port["r1d"]), _ret(port["mtd"]),
+        "<b>Carteira TAG</b>", "100%", "—", "—", "—", _ret(port["r3m"] if monthly else port["r1d"]), _ret(port["mtd"]),
         _ret(port["ytd"]), _ret(port["r1y"]), _ret(port["r2y"]), _ret(port["r3y"]), "—"]})
-    _table(["ETF", "Peso", "Preço", "AUM", "Mkt cap médio", "Dia", "MTD", "YTD", "12M",
+    _table(["ETF", "Peso", f"Preço ({_br_date(data['snapshot_date'])})" if monthly else "Preço", "AUM",
+            "Mkt cap médio", "3M" if monthly else "Dia", "Mês" if monthly else "MTD", "YTD", "12M",
             "24M a.a.", "36M a.a.", "Vol 12M"], rows, min_width=1100)
     st.caption(
+        (f"Retornos totais em USD até o fechamento de {_br_date(data['reference_date'])}, encadeando os retornos "
+         "mensais do Morningstar; vol 12M = desvio-padrão dos 12 retornos mensais × √12. Preço, AUM e mkt cap do "
+         f"último pregão ({_br_date(data['snapshot_date'])}). " if monthly else "") +
         "Mkt cap médio = média geométrica do valor de mercado das ações do ETF (Morningstar). "
         "24M/36M anualizados. Carteira = média dos ETFs pelos pesos atuais, renormalizada para os ETFs com "
         "dado no período (DRAM só existe desde 01/04/2026; BRIJ desde 03/09/2024). "
@@ -252,10 +362,10 @@ def render_overview():
 
     # ── Retorno desde a entrada de cada tema na carteira ──
     _section("🎯 Retorno desde a entrada de cada tema na carteira TAG")
-    from datetime import date
     ref_d = date.fromisoformat(data["reference_date"])
     erows = []
-    for e in sorted([e for e in etfs if e.get("entry_date")], key=lambda e: e["entry_date"]):
+    for e in sorted([e for e in etfs if e.get("entry_date") and e.get("since_entry") is not None],
+                    key=lambda e: e["entry_date"]):
         days = (ref_d - date.fromisoformat(e["entry_date"])).days
         erows.append({"cells": [
             _pill(e["key"]), e["camada"], _pct(e["weight"], 1), _br_date(e["entry_date"]), _num(days, 0),
@@ -281,7 +391,9 @@ def render_overview():
     _section("📅 Retorno por ano-calendário (USD) e variação cambial")
     cal = data["calendar"]
     years = [str(y) for y in cal["years"]]
-    head = [f"{y} (YTD)" if y == years[0] else y for y in years]
+    full_year = data["reference_date"][5:] == "12-31"
+    head = [f"{y} (YTD)" if y == years[0] and not full_year else y for y in years]
+    fx, brl, fx_end, ye = _calendar_brl(data)
     crows = []
     for r in cal["rows"]:
         cells = [_pill(r["key"]), _pct(r["weight"], 1)]
@@ -295,21 +407,21 @@ def render_overview():
                   ["<b>Carteira TAG (USD)</b>", "100%"] + [_ret(cal["portfolio"][y]) for y in years]})
     crows.append({"_style": "background:#f7f7f7;border-top:2px solid #ddd", "cells":
                   ["<b>USD/BRL</b> <span style='color:#888;font-size:11px'>(PTAX)</span>", "—"]
-                  + [_ret(cal["usdbrl"][y]) for y in years]})
+                  + [_ret(fx.get(y, fx.get(int(y)))) for y in years]})
     crows.append({"_style": "background:#f7f7f7;font-weight:700", "cells":
-                  ["<b>Carteira TAG em BRL</b>", "—"] + [_ret(cal["portfolio_brl"][y]) for y in years]})
+                  ["<b>Carteira TAG em BRL</b>", "—"] + [_ret(brl.get(y, brl.get(int(y)))) for y in years]})
     _table(["ETF", "Peso"] + head, crows, min_width=760)
-    lv = cal["usdbrl_levels"]
     cov_txt = " · ".join(f"{y}: {_num(cal['portfolio_cov'][y], 0)}%" for y in years)
     st.caption(
         f"Retorno total em USD. {years[0]} = acumulado no ano até {_br_date(data['reference_date'])}. "
         "Em branco: ETF ainda não existia ou teve ano parcial de lançamento (BRIJ 03/09/2024, GRDU 14/04/2022). "
         "† DRAM: desde o início (01/04/2026), fora da média da carteira. Carteira = média pelos pesos atuais, "
         f"renormalizada para os ETFs com ano completo (cobertura — {cov_txt}). "
-        "USD/BRL = variação da PTAX venda do Banco Central entre fins de ano "
-        f"(R$ {_num(lv['2021'], 4)} → {_num(lv['2022'], 4)} → {_num(lv['2023'], 4)} → {_num(lv['2024'], 4)} → "
-        f"{_num(lv['2025'], 4)} → {_num(lv['ref'], 4)} em {_br_date(data.get('usdbrl_ref_date', data['reference_date']))}); positivo = real "
-        "desvalorizou. Carteira em BRL = (1 + retorno USD) × (1 + variação USD/BRL) − 1.")
+        "USD/BRL = variação da PTAX venda do Banco Central entre fins de ano (R$ "
+        + " → ".join(_num(ye.get(int(y) - 1), 4) for y in reversed(years))
+        + (f" → {_num(fx_end[0], 4)} em {_br_date(fx_end[1])}" if fx_end
+           else " → PTAX da data final indisponível no momento (Banco Central não respondeu)")
+        + "); positivo = real desvalorizou. Carteira em BRL = (1 + retorno USD) × (1 + variação USD/BRL) − 1.")
 
     # ── Valuation ──
     _section("💰 Valuation e fundamentos (carteira de cada ETF)")
