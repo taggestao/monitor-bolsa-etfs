@@ -2604,10 +2604,10 @@
   "GBP": 0.745437,
   "CHF": 0.820697,
   "DKK": 6.675781,
-  "KRW": 1359.64,
+  "KRW": 1340.704601,
   "JPY": 158.45111,
-  "TWD": 31.872,
-  "CNY": 6.704
+  "TWD": 32.797177,
+  "CNY": 6.671405
  },
  "fx_date": "2026-11-03",
  "usdbrl_ptax": {
@@ -2980,12 +2980,5 @@
   }
  },
  "monthly_returns_note": "HP010 Monthly Return (Morningstar); CSPX = variação mensal do HS793 (o Morningstar não publica HP010 para esta classe UCITS)",
- "fx_manual": {
-  "currencies": [
-   "KRW",
-   "TWD",
-   "CNY"
-  ],
-  "date": "2026-09-29"
- }
+ "fx_market_date": "2026-11-03"
 }

@@ -14,7 +14,8 @@ sessão do Claude com o conector Morningstar (rotina diária — ver ATUALIZACAO
   4. python build_tag_equities.py  → tag_equities.json (lido pelo app).
 
 Também atualiza os retornos mensais (HP010; CSPX pelo HS793) que alimentam o seletor de
-fechamento mensal do app, e busca no Banco Central a PTAX e o câmbio de EUR, GBP, CHF, DKK e JPY.
+fechamento mensal do app, e busca o câmbio: PTAX e EUR/GBP/CHF/DKK/JPY no Banco Central;
+KRW/TWD/CNY na currency-api.
 Holdings e X-Ray mudam pouco (mensal) e continuam sendo atualizados à parte.
 """
 import argparse, calendar, datetime as dt, glob, json, os, sys, urllib.request
@@ -45,6 +46,10 @@ MONTHLY_RETURN = "HP010"  # Monthly Return (%) — CSPX não tem: usa a variaç�
 STOCK_BATCH = 10
 BCB_PTAX = "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
 BCB_FX = ("EUR", "GBP", "CHF", "DKK", "JPY")   # moedas das ações cobertas pela PTAX do BCB
+# KRW, TWD e CNY não têm PTAX: vêm da currency-api (fawazahmed0, cotações diárias por data), com espelho
+MARKET_FX = ("KRW", "TWD", "CNY")
+MARKET_FX_URLS = ("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{day}/v1/currencies/usd.json",
+                  "https://{day}.currency-api.pages.dev/v1/currencies/usd.json")
 
 
 def _month_end_before(d):
@@ -72,6 +77,21 @@ def bcb_rate(cur, day):
         vals = [v for v in json.load(r)["value"] if v.get("tipoBoletim", "Fechamento") == "Fechamento"]
     last = max(vals, key=lambda v: v["dataHoraCotacao"])
     return float(last["cotacaoVenda"]), last["dataHoraCotacao"][:10]
+
+
+def market_fx(day):
+    """Unidades de KRW, TWD e CNY por 1 USD na data `day` (ou no dia útil anterior mais próximo)."""
+    d, last_exc = dt.date.fromisoformat(day), None
+    for back in range(5):
+        day_s = (d - dt.timedelta(days=back)).isoformat()
+        for url in MARKET_FX_URLS:
+            try:
+                with urllib.request.urlopen(url.format(day=day_s), timeout=15) as r:
+                    usd = json.load(r)["usd"]
+                return {c: round(float(usd[c.lower()]), 6) for c in MARKET_FX}, day_s
+            except Exception as exc:
+                last_exc = exc
+    raise RuntimeError(f"currency-api indisponível: {last_exc}")
 
 
 def _num(v):
@@ -237,10 +257,16 @@ def apply(data, snap, series, args):
                 fx[cur] = round(usd / v, 6)
             data["fx_per_usd"].update(fx)
             data["fx_date"] = usd_day
-            log.append(f"BCB: PTAX {usd} em {usd_day}; " + ", ".join(f"{k} {v}" for k, v in fx.items())
-                       + " (KRW, TWD e CNY continuam manuais)")
+            log.append(f"BCB: PTAX {usd} em {usd_day}; " + ", ".join(f"{k} {v}" for k, v in fx.items()))
         except Exception as exc:  # BCB fora do ar ou bloqueado: mantém os valores anteriores
             log.append(f"BCB indisponível ({exc}); câmbio mantido em {data['fx_date']}")
+        try:
+            fx, fx_day = market_fx(ref)
+            data["fx_per_usd"].update(fx)
+            data["fx_market_date"] = fx_day
+            log.append(f"currency-api: {', '.join(f'{k} {v}' for k, v in fx.items())} em {fx_day}")
+        except Exception as exc:
+            log.append(f"{exc}; KRW/TWD/CNY mantidos em {data.get('fx_market_date')}")
     if args.ptax:
         data["usdbrl_ptax"]["ref"] = args.ptax
         data["usdbrl_ptax_ref_date"] = args.ptax_date or ref
@@ -265,7 +291,8 @@ def main():
     ap.add_argument("--ptax-date", help="data da PTAX (AAAA-MM-DD)")
     ap.add_argument("--fx", nargs="*", help="moeda local por 1 USD, ex.: EUR=0.8612 KRW=1362.5")
     ap.add_argument("--fx-date", help="data das cotações de --fx (AAAA-MM-DD)")
-    ap.add_argument("--no-bcb", action="store_true", help="não buscar PTAX/câmbio no Banco Central")
+    ap.add_argument("--no-bcb", action="store_true",
+                    help="não buscar câmbio na internet (PTAX/BCB e currency-api)")
     args = ap.parse_args()
 
     with open(DATA_FILE, encoding="utf-8") as f:

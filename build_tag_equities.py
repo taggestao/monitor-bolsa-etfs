@@ -523,8 +523,7 @@ def main():
         "title": "Monitor de ETFs — Carteira de Bolsa TAG (Ecossistema AI)",
         "reference_date": REF_DATE, "mo_end_date": MO_END_DATE, "holdings_date": HOLDINGS_DATE,
         "source": f"Morningstar MCP (Data Tool, Fund Holdings, X-Ray) · câmbio: PTAX/BCB "
-                  f"{_br(MS['fx_date'])}; {'/'.join(MS['fx_manual']['currencies'])}: fontes públicas "
-                  f"{_br(MS['fx_manual']['date'])}",
+                  f"{_br(MS['fx_date'])}; KRW/TWD/CNY: currency-api {_br(MS['fx_market_date'])}",
         "fx_per_usd": FX_PER_USD, "fx_date": MS["fx_date"], "usdbrl_ref_date": MS["usdbrl_ptax_ref_date"],
         "usdbrl_ref": USDBRL_PTAX["ref"], "usdbrl_year_end": {str(k): v for k, v in USDBRL_PTAX.items() if k != "ref"},
         "etfs": etfs, "portfolio": port, "entry_summary": build_entry_summary(etfs), "calendar": calendar, "xray": XRAY,

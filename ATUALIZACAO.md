@@ -25,9 +25,11 @@ fechamento disponível no Morningstar.
    cobrir o fim do mês anterior ou se o histórico do DRAM tiver lacunas.
    - Também grava o retorno do mês que acabou de fechar em `monthly_returns`, que é a base do
      seletor de data final do app.
-   - Busca no Banco Central (olinda.bcb.gov.br) a PTAX e o câmbio de EUR, GBP, CHF, DKK e JPY. KRW,
-     TWD e CNY não são cobertos pelo BCB e ficam manuais (`--fx KRW=1360 ...`). Para sobrepor:
-     `--ptax 5.1234 --ptax-date AAAA-MM-DD`. Para não consultar o BCB: `--no-bcb`.
+   - Busca o câmbio na data de referência: PTAX e EUR, GBP, CHF, DKK e JPY no Banco Central
+     (olinda.bcb.gov.br); KRW, TWD e CNY, que o BCB não publica, na currency-api (cdn.jsdelivr.net,
+     com espelho em currency-api.pages.dev). Se uma fonte falhar, mantém os valores anteriores.
+     Para sobrepor: `--ptax 5.1234 --ptax-date AAAA-MM-DD` ou `--fx KRW=1360 ...`. Para não
+     consultar a internet: `--no-bcb`.
 4. `python build_tag_equities.py` regenera `tag_equities.json`.
 5. Commit de `morningstar_data.json` e `tag_equities.json`, depois push na `main`.
 
