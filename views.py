@@ -10,6 +10,8 @@ from datetime import date, timedelta
 import plotly.graph_objects as go
 import streamlit as st
 
+import agregados as AG
+
 _DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tag_equities.json")
 
 TAG_VINHO = "#630d24"
@@ -129,9 +131,12 @@ def _load_file(mtime):
         return json.load(f)
 
 
-# Seletor de data final (sidebar): um fechamento mensal (AAAA-MM-DD) ou "diario" (último pregão).
+# Seletor de data final: um fechamento mensal (AAAA-MM-DD) ou "diario" (último pregão). Aparece na barra
+# lateral (PERIOD_KEY) e na aba Carteira TAG (PERIOD_KEY_LT); os dois ficam sincronizados.
 PERIOD_KEY = "periodo"
+PERIOD_KEY_LT = "periodo_lt"
 DAILY = "diario"
+WEIGHT_KEY = "peso_{}"   # pesos digitados pelo usuário (aba Carteira TAG), um por ETF
 _RET_FIELDS = ("mtd", "r3m", "ytd", "r1y", "r2y", "r3y", "vol1y", "vol_note", "since_inception",
                "since_entry", "cspx_since_entry")
 
@@ -149,36 +154,90 @@ def period_options():
     return opts, base.get("default_period", DAILY)
 
 
+def init_state():
+    """Valores iniciais do seletor de data e dos pesos (antes de qualquer widget ou cálculo)."""
+    base = _base()
+    opts, default = period_options()
+    valid = {v for v, _ in opts}
+    if st.session_state.get(PERIOD_KEY) not in valid:
+        st.session_state[PERIOD_KEY] = default if default in valid else opts[0][0]
+    st.session_state[PERIOD_KEY_LT] = st.session_state[PERIOD_KEY]
+    for k, w in base["official_weights"].items():
+        st.session_state.setdefault(WEIGHT_KEY.format(k), float(w))
+
+
+def sync_period(src):
+    """on_change dos seletores de data: copia o valor escolhido para o outro seletor."""
+    other = PERIOD_KEY_LT if src == PERIOD_KEY else PERIOD_KEY
+    st.session_state[other] = st.session_state[src]
+
+
+def reset_weights():
+    for k, w in _base()["official_weights"].items():
+        st.session_state[WEIGHT_KEY.format(k)] = float(w)
+
+
+def weights():
+    """(pesos normalizados para 100%, soma digitada, personalizado?)"""
+    off = _base()["official_weights"]
+    raw = {k: float(st.session_state.get(WEIGHT_KEY.format(k), w) or 0) for k, w in off.items()}
+    tot = sum(raw.values())
+    if tot <= 0:
+        return dict(off), tot, False
+    return {k: v * 100 / tot for k, v in raw.items()}, tot, any(abs(raw[k] - off[k]) > 1e-9 for k in off)
+
+
 @st.cache_data(show_spinner=False)
-def _period_view(mtime, period):
-    """Dados do app com os retornos recalculados no fechamento mensal `period`."""
+def _view(mtime, period, wkey, custom):
+    """Dados do app na data final `period` (fechamento mensal ou DAILY) e com os pesos `wkey`."""
     data = copy.deepcopy(_load_file(mtime))
-    p = data["periods"][period]
-    for e in data["etfs"]:
-        e.update({f: p["etfs"][e["key"]].get(f) for f in _RET_FIELDS})
-        e["r1d"] = None
-    data["portfolio"].update(p["portfolio"])
-    data["portfolio"]["r1d"] = None
-    if p["entry_summary"]:
-        data["entry_summary"] = p["entry_summary"]
-    data["calendar"] = p["calendar"]
-    m = date.fromisoformat(period)
     data["snapshot_date"] = data["reference_date"]
-    data["reference_date"] = period
-    data["mo_end_date"] = (m.replace(day=1) - timedelta(days=1)).isoformat()
-    data["mode"] = "month"
+    month = period != DAILY and period in data.get("periods", {})
+    if month:
+        p = data["periods"][period]
+        for e in data["etfs"]:
+            e.update({f: p["etfs"][e["key"]].get(f) for f in _RET_FIELDS})
+            e["r1d"] = None
+        data["calendar"] = p["calendar"]
+        m = date.fromisoformat(period)
+        data["reference_date"] = period
+        data["mo_end_date"] = (m.replace(day=1) - timedelta(days=1)).isoformat()
+    for e in data["etfs"]:
+        e.setdefault("r3m", None)
+    data["mode"] = "month" if month else "daily"
+
+    # ── Pesos: carteira, desde a entrada e ano-calendário recalculados ──
+    w = dict(wkey)
+    for e in data["etfs"]:
+        e["weight"] = w[e["key"]]
+    data["portfolio"].update(AG.portfolio(data["etfs"], w))
+    data["entry_summary"] = AG.entry_summary(data["etfs"], w)
+    cal = data["calendar"]
+    cal["portfolio"], cal["portfolio_cov"] = AG.calendar_portfolio(cal["rows"], cal["years"], w)
+    for r in cal["rows"]:
+        r["weight"] = w[r["key"]]
+    data["custom_weights"] = custom
+
+    # ── Holdings e ações na data final ──
+    hist = data["holdings_history"]
+    target = date.fromisoformat(data["reference_date"])
+    hdate = min(hist, key=lambda d: (abs((date.fromisoformat(d) - target).days), d))
+    holdings = {k: [tuple(r) for r in v] for k, v in hist[hdate].items()}
+    rows = copy.deepcopy(data["stock_rows"])
+    if month:
+        sp = data.get("stock_periods", {}).get(period, {})
+        for k, r in rows.items():
+            r.update({"r1d": None, "mtd": None, "ytd": None, "r1y": None, **sp.get(k, {})})
+    data["top10"] = AG.top10(holdings, rows)
+    data["lookthrough"], data["lookthrough_top10"] = AG.lookthrough(holdings, w, rows)
+    data["holdings_used_date"] = hdate
     return data
 
 
 def _load():
-    base = _base()
-    sel = st.session_state.get(PERIOD_KEY) or base.get("default_period", DAILY)
-    if sel == DAILY or sel not in base.get("periods", {}):
-        data = dict(base, mode="daily", snapshot_date=base["reference_date"])
-        for e in data["etfs"]:
-            e.setdefault("r3m", None)
-        return data
-    return _period_view(os.path.getmtime(_DATA_FILE), sel)
+    w, _, custom = weights()
+    sel = st.session_state.get(PERIOD_KEY) or _base().get("default_period", DAILY)
+    return _view(os.path.getmtime(_DATA_FILE), sel, tuple(sorted(w.items())), custom)
 
 
 def load_data():
@@ -289,9 +348,11 @@ def render_overview():
             f"{'+' if r >= 0 else ''}{_pct(r)}</div>"
             f"<div style='font-size:11px;color:{TAG_GRAY}'>vs. CSPX: {_pp(diff)}</div></div>")
     es = data["entry_summary"]
-    beat = es["diff"] >= 0
+    if es is None:
+        st.info("Nenhum tema da carteira tinha entrado até a data final escolhida (ou todos estão com peso zero).")
+    beat = es is not None and es["diff"] >= 0
     bc = TAG_GREEN if beat else TAG_RED
-    cards += (
+    cards += "" if es is None else (
         f"<div style='background:{TAG_VINHO};color:#fff;border-radius:10px;padding:8px 12px;flex:1.35 1 0;min-width:0'>"
         f"<div style='font-size:11px;font-weight:700;letter-spacing:.3px;opacity:.9'>MÉDIA PONDERADA DOS TEMAS</div>"
         f"<div style='display:flex;gap:10px;align-items:baseline;margin-top:4px'>"
@@ -300,15 +361,16 @@ def render_overview():
         f"<div style='font-size:11px;margin-top:2px'><span style='background:#fff;color:{bc};font-weight:700;"
         f"padding:0 6px;border-radius:6px'>{'▲ bate' if beat else '▼ perde para'} o S&P "
         f"{'+' if es['diff'] >= 0 else ''}{_num(es['diff'], 2)} p.p.</span></div></div>")
-    st.markdown(
-        f"<div style='margin:14px 0 4px 0;font-size:12px;font-weight:700;color:{TAG_VINHO};"
-        f"text-transform:uppercase;letter-spacing:.4px'>🎯 Retorno desde a entrada de cada tema (USD)</div>"
-        f"<div style='display:flex;gap:6px;overflow-x:auto'>{cards}</div>"
-        f"<div style='font-size:11.5px;color:{TAG_GRAY};margin-top:4px'>Média ponderada pelo peso de cada tema na "
-        f"carteira TAG ({_pct(es['weight'], 0)} do total, {es['n']} temas) vs. o S&P 500 (CSPX) nas mesmas janelas. "
-        f"Efeito na carteira inteira vs. manter esse capital no S&P: <b style='color:{bc}'>"
-        f"{'+' if es['excess_total'] >= 0 else ''}{_num(es['excess_total'], 2)} p.p.</b></div>",
-        unsafe_allow_html=True)
+    if es is not None:
+        st.markdown(
+            f"<div style='margin:14px 0 4px 0;font-size:12px;font-weight:700;color:{TAG_VINHO};"
+            f"text-transform:uppercase;letter-spacing:.4px'>🎯 Retorno desde a entrada de cada tema (USD)</div>"
+            f"<div style='display:flex;gap:6px;overflow-x:auto'>{cards}</div>"
+            f"<div style='font-size:11.5px;color:{TAG_GRAY};margin-top:4px'>Média ponderada pelo peso de cada tema na "
+            f"carteira TAG ({_pct(es['weight'], 0)} do total, {es['n']} temas) vs. o S&P 500 (CSPX) nas mesmas janelas. "
+            f"Efeito na carteira inteira vs. manter esse capital no S&P: <b style='color:{bc}'>"
+            f"{'+' if es['excess_total'] >= 0 else ''}{_num(es['excess_total'], 2)} p.p.</b></div>",
+            unsafe_allow_html=True)
 
     # ── Alocação ──
     _section("🧩 Alocação e camada do ecossistema")
@@ -372,11 +434,13 @@ def render_overview():
             _ret(e["since_entry"]), _ret(e["cspx_since_entry"]), _pp(e["since_entry"] - e["cspx_since_entry"]),
         ]})
     es = data["entry_summary"]
-    erows.append({"_style": f"background:{TAG_VINHO}0d;font-weight:700", "cells": [
-        "<b>Média ponderada</b>", f"{es['n']} temas", _pct(es["weight"], 1), "—", "—",
-        _ret(es["avg"]), _ret(es["avg_cspx"]), _pp(es["diff"], 2)]})
-    erows.append({"_style": "background:#f7f7f7", "cells": [
-        "Efeito na carteira TAG", "Σ peso × (tema − CSPX)", "100%", "—", "—", "—", "—", _pp(es["excess_total"], 2)]})
+    if es is not None:
+        erows.append({"_style": f"background:{TAG_VINHO}0d;font-weight:700", "cells": [
+            "<b>Média ponderada</b>", f"{es['n']} temas", _pct(es["weight"], 1), "—", "—",
+            _ret(es["avg"]), _ret(es["avg_cspx"]), _pp(es["diff"], 2)]})
+        erows.append({"_style": "background:#f7f7f7", "cells": [
+            "Efeito na carteira TAG", "Σ peso × (tema − CSPX)", "100%", "—", "—", "—", "—",
+            _pp(es["excess_total"], 2)]})
     _table(["Tema", "Camada", "Peso", "Entrada", "Dias", "Retorno desde a entrada", "CSPX no período",
             "Diferença vs. CSPX"], erows, min_width=900)
     st.caption(
@@ -500,24 +564,70 @@ def render_top10():
                    format_func=lambda l: l.split(" — ")[0])
     key = etfs[labels.index(sel)]["key"]
     st.markdown(f"<p style='color:{TAG_GRAY};font-size:0.85rem;margin:0'>{sel}</p>", unsafe_allow_html=True)
-    _stock_table(data["top10"][key], weight_label=f"% {key}")
+    _stock_table(data["top10"][key], weight_label=f"% {key}", monthly=data["mode"] == "month")
     if key == "DRAM":
+        cash = sum(r[1] for r in data["holdings_history"][data["holdings_used_date"]]["DRAM"] if r[2] == "CASH")
         st.caption("DRAM: posição direta + swaps somados por empresa (exposição econômica). "
-                   "~37% do patrimônio em T-Bills/money market como colateral dos swaps não aparece no top 10.")
+                   f"{_pct(cash, 0)} do patrimônio em T-Bills/money market/caixa, colateral dos swaps, "
+                   "não aparece no top 10.")
     top_w = sum(r["weight"] for r in data["top10"][key])
-    st.caption(f"Top 10 = {_pct(top_w, 1)} do {key}.")
+    st.caption(f"Top 10 = {_pct(top_w, 1)} do {key}. {_dates_note(data)}")
 
 
 
 # ===================== CARTEIRA TAG (LOOK-THROUGH) =====================
+def render_weights_editor():
+    """Pesos de cada ETF digitados pelo usuário: recalculam a carteira em todas as abas."""
+    off = _base()["official_weights"]
+    _, tot, custom = weights()
+    with st.expander("⚖️ Pesos dos ETFs na carteira — digite outros % para simular", expanded=custom):
+        cols = st.columns(len(off))
+        for col, k in zip(cols, off):
+            col.number_input(f"{k} (%)", min_value=0.0, max_value=100.0, step=0.5, format="%.1f",
+                             key=WEIGHT_KEY.format(k), help=f"Peso oficial: {_pct(off[k], 1)}")
+        c1, c2 = st.columns([3, 1])
+        if abs(tot - 100) > 0.05:
+            c1.warning(f"Os pesos somam {_pct(tot, 1)}: nos cálculos eles são reescalados para somar 100%.")
+        else:
+            c1.caption(f"Soma: {_pct(tot, 1)}. "
+                       + ("Pesos personalizados valem para todas as abas nesta sessão." if custom
+                          else "Pesos oficiais da carteira TAG."))
+        c2.button("Restaurar pesos oficiais", on_click=reset_weights, use_container_width=True,
+                  disabled=not custom)
+
+
 def render_lookthrough():
+    opts, _ = period_options()
+    labels = dict(opts)
+    c1, c2 = st.columns([1, 2])
+    c1.selectbox("Data final", [v for v, _ in opts], format_func=labels.get, key=PERIOD_KEY_LT,
+                 on_change=sync_period, args=(PERIOD_KEY_LT,),
+                 help="Fechamento mensal: retornos das ações e da carteira até o fim do mês escolhido. "
+                      "Último pregão: dados diários mais recentes. Também muda a data das outras abas.")
+    render_weights_editor()
     data = _load()
     etfs, port, xray = data["etfs"], data["portfolio"], data["xray"]
     lt = data["lookthrough"]
     agg10 = data["lookthrough_top10"]
+    monthly = data["mode"] == "month"
+    pesos = " · ".join(f"{e['key']} {_pct(e['weight'], 1)}" for e in etfs)
+    c2.markdown(
+        f"<div style='font-size:12.5px;color:#333;margin-top:30px'>"
+        f"<b>{'Fechamento de ' + _br_date(data['reference_date']) if monthly else 'Último pregão: ' + _br_date(data['reference_date'])}"
+        f"</b> · pesos {'personalizados' if data['custom_weights'] else 'oficiais'}: {pesos}</div>",
+        unsafe_allow_html=True)
     _section("🏆 Top posições da carteira de bolsa TAG (look-through pelos pesos dos ETFs)")
     n_show = st.radio("Mostrar", [10, 25], horizontal=True, key="tag_eq_lt_n", format_func=lambda n: f"Top {n}")
-    _stock_table(lt[:n_show], weight_label="% Carteira TAG", show_sources=True)
+    _stock_table(lt[:n_show], weight_label="% Carteira TAG", show_sources=True, monthly=monthly)
+    if monthly:
+        pr = [(r["weight"], r.get("mtd")) for r in lt[:n_show]]
+        pr_y = [(r["weight"], r.get("ytd")) for r in lt[:n_show]]
+        m_avg, m_cov = AG.arith(pr)
+        y_avg, y_cov = AG.arith(pr_y)
+        st.markdown(
+            f"<div style='font-size:12.5px;color:#333;margin-top:6px'><b>Top {n_show} no fechamento de "
+            f"{_br_date(data['reference_date'])}</b> (média pelo peso na carteira, entre as ações com dado): "
+            f"mês {_ret(m_avg)} · YTD {_ret(y_avg)}</div>", unsafe_allow_html=True)
     st.markdown(
         f"<div style='font-size:12.5px;color:#333;margin-top:6px'><b>Top 10 agregado</b> "
         f"({_pct(agg10['weight'], 1)} da carteira): P/E TTM {_mult(agg10['pe'])} · P/E Fwd {_mult(agg10['fpe'])} · "
@@ -525,9 +635,10 @@ def render_lookthrough():
         f"Preço/Fair Value médio {_num(agg10['pfv'], 2)}</div>", unsafe_allow_html=True)
     st.caption(
         "Look-through = Σ (peso do ETF × peso da ação no ETF), usando as 25 maiores posições de cada ETF. "
-        "Alphabet A+C consolidadas; DRAM com swaps atribuídos à ação subjacente. Market cap convertido para USD "
-        "pelo câmbio de 29/09/2026. P/E TTM > 200x ou negativo exibido como n.s. Preço/Fair Value < 1 = abaixo do "
-        "valor justo estimado pela Morningstar.")
+        "Alphabet A+C, ADRs e preferenciais consolidadas; DRAM com swaps atribuídos à ação subjacente. "
+        f"Market cap convertido para USD pelo câmbio de {_br_date(data['fx_date'])}. P/E TTM > 200x ou negativo "
+        "exibido como n.s. Preço/Fair Value < 1 = abaixo do valor justo estimado pela Morningstar. "
+        + _dates_note(data))
 
     # Barras empilhadas: origem da exposição
     top = lt[:15]
@@ -547,6 +658,8 @@ def render_lookthrough():
 
     # ── Setores X-Ray ──
     _section("🏭 Setores — Carteira TAG vs. S&P 500 (X-Ray Morningstar)")
+    st.caption(f"X-Ray com os pesos oficiais e portfólio de {_br_date(xray['as_of'])} (o Morningstar calcula o "
+               "X-Ray só no fechamento mais recente; não muda com a data final nem com os pesos digitados).")
     sec = xray["sectors"]
     names = list(sec.keys())
     fig = go.Figure()
@@ -565,12 +678,12 @@ def render_lookthrough():
     st.caption(f"Fonte: {data['source']}.")
 
 
-def _stock_table(rows, weight_label, show_sources=False):
+def _stock_table(rows, weight_label, show_sources=False, monthly=False):
     headers = ["Empresa", "Ticker", "País", "Setor", weight_label]
     if show_sources:
         headers.append("Via")
-    headers += ["Mkt cap", "Preço", "Dia", "YTD", "12M", "P/E TTM", "P/E Fwd", "P/BV", "ROE",
-                "Div. Yield", "P/FV", "Moat"]
+    headers += ["Mkt cap"] + (["Mês", "YTD", "12M"] if monthly else ["Preço", "Dia", "YTD", "12M"])
+    headers += ["P/E TTM", "P/E Fwd", "P/BV", "ROE", "Div. Yield", "P/FV", "Moat"]
     out = []
     for r in rows:
         pe = "n.s." if r.get("pe_ns") else _mult(r.get("pe"))
@@ -578,12 +691,27 @@ def _stock_table(rows, weight_label, show_sources=False):
                  f"<b>{_pct(r['weight'])}</b>"]
         if show_sources:
             cells.append(" ".join(_pill(k) for k in r["sources"]))
-        cells += [
-            _bn(r.get("mcap_usd_bn")),
-            "—" if r.get("price") is None else f"{r['cur']} {_num(r['price'])}",
-            _ret(r.get("r1d")), _ret(r.get("ytd")), _ret(r.get("r1y")),
-            pe, _mult(r.get("fpe")), _mult(r.get("pb"), 2), _pct(r.get("roe"), 1), _pct(r.get("dy")),
-            _pfv(r.get("pfv")), _moat(r.get("moat")),
-        ]
+        cells.append(_bn(r.get("mcap_usd_bn")))
+        if monthly:
+            cells += [_ret(r.get("mtd")), _ret(r.get("ytd")), _ret(r.get("r1y"))]
+        else:
+            cells += ["—" if r.get("price") is None else f"{r['cur']} {_num(r['price'])}",
+                      _ret(r.get("r1d")), _ret(r.get("ytd")), _ret(r.get("r1y"))]
+        cells += [pe, _mult(r.get("fpe")), _mult(r.get("pb"), 2), _pct(r.get("roe"), 1), _pct(r.get("dy")),
+                  _pfv(r.get("pfv")), _moat(r.get("moat"))]
         out.append({"cells": cells})
     _table(headers, out, min_width=1350)
+
+
+def _dates_note(data):
+    """Nota sobre as datas dos dados das ações (retornos, valuation e composição dos ETFs)."""
+    ref, snap, hd = (_br_date(data[k]) for k in ("reference_date", "snapshot_date", "holdings_used_date"))
+    oldest = min(data["holdings_history"])
+    comp = f"composição dos ETFs (holdings) de {hd}"
+    if data["holdings_used_date"] == oldest and data["reference_date"] < oldest:
+        comp += " (a mais antiga guardada; antes disso o Morningstar não fornece holdings históricas)"
+    if data["mode"] == "month":
+        return (f"Retornos das ações (Mês, YTD, 12M) no fechamento de {ref}, pelo retorno mensal Morningstar "
+                f"(disponível a partir de jan/2025; 12M a partir de dez/2025). Market cap e valuation do último "
+                f"pregão ({snap}); {comp}.")
+    return f"Preços, retornos e valuation das ações no último pregão ({snap}); {comp}."

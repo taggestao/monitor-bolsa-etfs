@@ -15,6 +15,7 @@ Fontes:
 import datetime as dt, json, math, os
 
 from carteira import ETF_ORDER, ISSUER_ALIAS, ISSUER_NAME, MS_IDS, PORTFOLIO, WEIGHTS, dram_consolidated
+import agregados as AG
 from periods import MonthlySeries, add_months, daily_stats, etf_period, month_end, weighted
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -263,37 +264,6 @@ def build_etfs():
     return etfs
 
 
-def _harmonic(pairs):
-    """Média harmônica ponderada (padrão para múltiplos de carteira): 1 / Σ w·(1/x)."""
-    pairs = [(w, x) for w, x in pairs if x not in (None, 0) and x > 0]
-    tw = sum(w for w, _ in pairs)
-    return (tw / sum(w / x for w, x in pairs), tw) if pairs else (None, 0)
-
-
-def _arith(pairs):
-    pairs = [(w, x) for w, x in pairs if x is not None]
-    tw = sum(w for w, _ in pairs)
-    return (sum(w * x for w, x in pairs) / tw, tw) if pairs else (None, 0)
-
-
-def build_portfolio(etfs):
-    w = {e["key"]: e["weight"] / 100 for e in etfs}
-    out = {}
-    for f in ("r1d", "mtd", "ytd", "r1y", "r2y", "r3y"):
-        v, cov = _arith([(w[e["key"]], e[f]) for e in etfs])
-        out[f] = v
-        out[f + "_cov"] = cov * 100
-    for f in ("pe", "fpe", "pb", "fpb", "ps", "pcf"):
-        v, cov = _harmonic([(w[e["key"]], e[f]) for e in etfs])
-        out[f] = v
-        out[f + "_cov"] = cov * 100
-    for f in ("roe", "dy", "net_margin", "debt_cap", "eg_lt", "ter"):
-        v, cov = _arith([(w[e["key"]], e[f]) for e in etfs])
-        out[f] = v
-        out[f + "_cov"] = cov * 100
-    return out
-
-
 def stock_row(ms_id):
     s = STOCKS.get(ms_id)
     if not s:
@@ -308,64 +278,6 @@ def stock_row(ms_id):
         "roe": None if s["roe"] is None else s["roe"] * 100,
         "dy": None if s["dy"] is None else s["dy"] * 100, "pfv": s["pfv"], "moat": s["moat"],
     }
-
-
-def build_top10():
-    top = {}
-    for key in ETF_ORDER:
-        rows = [r for r in HOLDINGS[key] if r[2] != "CASH"]
-        # DRAM: consolida posição direta + swaps (+ ADR/preferencial) na mesma empresa antes do top 10
-        if key == "DRAM":
-            rows = dram_consolidated(rows)
-        top[key] = [{"name": name, "weight": wgt, "ms_id": ms_id, **(stock_row(ms_id) or {})}
-                    for name, wgt, ms_id in rows[:10]]
-    return top
-
-
-def build_lookthrough():
-    agg = {}
-    for key in ETF_ORDER:
-        wf = WEIGHTS[key] / 100
-        for name, wgt, ms_id in HOLDINGS[key]:
-            if ms_id == "CASH":
-                continue
-            issuer = ISSUER_ALIAS.get(ms_id, ms_id)
-            a = agg.setdefault(issuer, {"ms_id": issuer, "name": ISSUER_NAME.get(issuer, name),
-                                        "weight": 0.0, "sources": {}})
-            a["weight"] += wf * wgt
-            a["sources"][key] = a["sources"].get(key, 0.0) + wf * wgt
-    rows = sorted(agg.values(), key=lambda r: -r["weight"])
-    out = []
-    for r in rows[:25]:
-        r.update(stock_row(r["ms_id"]) or {})
-        r["sources"] = {k: round(v, 3) for k, v in sorted(r["sources"].items(), key=lambda kv: -kv[1])}
-        out.append(r)
-    top10_w = sum(r["weight"] for r in out[:10])
-    # Múltiplos agregados das 10 maiores posições (média harmônica ponderada)
-    t10 = out[:10]
-    agg10 = {
-        "weight": top10_w,
-        "pe": _harmonic([(r["weight"], r.get("pe")) for r in t10])[0],
-        "fpe": _harmonic([(r["weight"], r.get("fpe")) for r in t10])[0],
-        "pb": _harmonic([(r["weight"], r.get("pb")) for r in t10])[0],
-        "roe": _arith([(r["weight"], r.get("roe")) for r in t10])[0],
-        "dy": _arith([(r["weight"], r.get("dy")) for r in t10])[0],
-        "pfv": _arith([(r["weight"], r.get("pfv")) for r in t10])[0],
-    }
-    return out, agg10
-
-
-def build_entry_summary(etfs):
-    """Média dos temas desde a entrada, ponderada pelo peso de cada tema na carteira TAG,
-    vs. o CSPX (S&P 500) nas mesmas janelas. excess_total = Σ peso × (tema − CSPX), em p.p. da
-    carteira inteira: quanto os temas somaram/tiraram vs. ter esse capital no S&P 500."""
-    th = [e for e in etfs if e.get("since_entry") is not None]
-    tw = sum(e["weight"] for e in th)
-    avg = sum(e["weight"] * e["since_entry"] for e in th) / tw
-    avg_cspx = sum(e["weight"] * e["cspx_since_entry"] for e in th) / tw
-    excess_total = sum(e["weight"] / 100 * (e["since_entry"] - e["cspx_since_entry"]) for e in th)
-    return {"weight": tw, "avg": avg, "avg_cspx": avg_cspx, "diff": avg - avg_cspx,
-            "excess_total": excess_total, "n": len(th)}
 
 
 def build_calendar(etfs):
@@ -424,21 +336,9 @@ def build_period(m, series, dram_launch):
                 row["cspx_since_entry"] = (cidx / CSPX_AT_ENTRY[ENTRY[key][0]] - 1) * 100
         etfs[key] = row
 
-    w = {k: WEIGHTS[k] / 100 for k in ETF_ORDER}
-    port = {}
-    for f in ("mtd", "r3m", "ytd", "r1y", "r2y", "r3y"):
-        v, cov = weighted([(w[k], etfs[k][f]) for k in ETF_ORDER])
-        port[f], port[f + "_cov"] = v, cov * 100
-
-    th = [k for k in ETF_ORDER if etfs[k]["since_entry"] is not None]
-    entry = None
-    if th:
-        tw = sum(WEIGHTS[k] for k in th)
-        avg = sum(WEIGHTS[k] * etfs[k]["since_entry"] for k in th) / tw
-        avg_c = sum(WEIGHTS[k] * etfs[k]["cspx_since_entry"] for k in th) / tw
-        entry = {"weight": tw, "avg": avg, "avg_cspx": avg_c, "diff": avg - avg_c, "n": len(th),
-                 "excess_total": sum(WEIGHTS[k] / 100 * (etfs[k]["since_entry"] - etfs[k]["cspx_since_entry"])
-                                     for k in th)}
+    rows_e = [dict(etfs[k], key=k) for k in ETF_ORDER]
+    port = {f: v for f, v in AG.portfolio(rows_e, WEIGHTS).items() if f.split("_cov")[0] in AG.RET_FIELDS}
+    entry = AG.entry_summary(rows_e, WEIGHTS)
 
     years = [m.year - i for i in range(5)]
     rows = []
@@ -451,12 +351,25 @@ def build_period(m, series, dram_launch):
         if key == "DRAM" and m.year == 2026 and m >= dram_launch:
             rets[2026], flags[2026] = etfs["DRAM"]["since_inception"], "desde 01/04/2026"
         rows.append({"key": key, "weight": WEIGHTS[key], "returns": rets, "flags": flags})
-    cal_port, cal_cov = {}, {}
-    for y in years:
-        v, cov = weighted([(r["weight"], r["returns"][y]) for r in rows if not r["flags"].get(y)])
-        cal_port[y], cal_cov[y] = v, cov
+    cal_port, cal_cov = AG.calendar_portfolio(rows, years, WEIGHTS)
     return {"etfs": etfs, "portfolio": port, "entry_summary": entry,
             "calendar": {"years": years, "rows": rows, "portfolio": cal_port, "portfolio_cov": cal_cov}}
+
+
+def build_stock_periods(periods):
+    """Retorno de cada ação no mês, YTD e 12M em cada fechamento mensal (HP010 Monthly Return)."""
+    series = {k: MonthlySeries(v) for k, v in MS.get("stock_monthly_returns", {}).items()}
+    out = {}
+    for md in periods:
+        m = dt.date.fromisoformat(md)
+        rows = {}
+        for k, s in series.items():
+            r = {f: v for f, v in etf_period(s, m).items() if f in ("mtd", "ytd", "r1y") and v is not None}
+            if r:
+                rows[k] = r
+        if rows:
+            out[md] = rows
+    return out
 
 
 def build_periods():
@@ -477,10 +390,14 @@ def build_periods():
 
 def main():
     etfs = build_etfs()
-    port = build_portfolio(etfs)
+    port = AG.portfolio(etfs, WEIGHTS)
     calendar = build_calendar(etfs)
-    top10 = build_top10()
-    look, agg10 = build_lookthrough()
+    stock_rows = {k: stock_row(k) for k in STOCKS}
+    top10 = AG.top10(HOLDINGS, stock_rows)
+    look, agg10 = AG.lookthrough(HOLDINGS, WEIGHTS, stock_rows)
+    periods = build_periods()
+    history = {d: {k: [list(r) for r in v] for k, v in h.items()}
+               for d, h in sorted(MS.get("holdings_history", {HOLDINGS_DATE: MS["holdings"]}).items())}
 
     def clean(o):
         if isinstance(o, float):
@@ -498,9 +415,12 @@ def main():
                   f"{_br(MS['fx_date'])}; KRW/TWD/CNY: currency-api {_br(MS['fx_market_date'])}",
         "fx_per_usd": FX_PER_USD, "fx_date": MS["fx_date"], "usdbrl_ref_date": MS["usdbrl_ptax_ref_date"],
         "usdbrl_ref": USDBRL_PTAX["ref"], "usdbrl_year_end": {str(k): v for k, v in USDBRL_PTAX.items() if k != "ref"},
-        "etfs": etfs, "portfolio": port, "entry_summary": build_entry_summary(etfs), "calendar": calendar, "xray": XRAY,
-        "top10": top10, "lookthrough": look, "lookthrough_top10": agg10,
-        "periods": build_periods(), "default_period": MO_END_DATE,
+        "etfs": etfs, "portfolio": port, "entry_summary": AG.entry_summary(etfs, WEIGHTS), "calendar": calendar,
+        "xray": XRAY, "top10": top10, "lookthrough": look, "lookthrough_top10": agg10,
+        "periods": periods, "default_period": MO_END_DATE,
+        # para o app recalcular com outros pesos e outra data final
+        "official_weights": WEIGHTS, "holdings": {k: [list(r) for r in v] for k, v in HOLDINGS.items()},
+        "holdings_history": history, "stock_rows": stock_rows, "stock_periods": build_stock_periods(periods),
     }
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(clean(data), f, ensure_ascii=False, indent=2)

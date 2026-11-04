@@ -24,8 +24,10 @@ fechamento disponível no Morningstar.
    `{"_as_of": "AAAA-MM-DD", "<etf_id>": [["<ms_id>", "<nome>", peso], ...]}` (ms_id vazio quando o
    Morningstar não informa). X-Ray: resposta original. Datapoints ausentes mantêm o valor anterior.
    Depois, `python refresh_morningstar.py --plan-stocks raw/` (fase 2) lista as chamadas das ações
-   que o app mostra (top 10 de cada ETF e top 25 da look-through, pelas holdings novas se vieram) e
-   do cadastro (ticker, país, setor, moeda) das ações que entraram agora. Salvar em `raw/` também.
+   que o app mostra (top 10 de cada ETF e top 25 da look-through, pelas holdings novas se vieram):
+   o snapshot diário, o retorno mensal (HP010) quando fecha um mês e, para ações que entraram
+   agora, o cadastro (ticker, país, setor, moeda) e o histórico de retorno mensal desde dez/2024.
+   Salvar em `raw/` também.
 3. `python refresh_morningstar.py raw/` atualiza `morningstar_data.json`. A data de referência
    é o último dia útil com HS793 do CSPX. O script para com erro se faltar ETF, se a série não
    cobrir o fim do mês anterior ou se o histórico do DRAM tiver lacunas.
@@ -49,6 +51,21 @@ mês, 3M, YTD, 12M, 24M e 36M, vol 12M, desde a entrada, ano-calendário e carte
 retornos mensais do Morningstar em `morningstar_data.json`. Preço, AUM, valuation e a aba de ações
 mostram sempre o último pregão coletado. A PTAX da data escolhida é buscada no Banco Central
 quando o app abre.
+
+## Pesos digitados e data final na aba Carteira TAG
+
+Na aba **Carteira TAG (look-through)** há um seletor de data final, sincronizado com o da barra
+lateral, e um campo de % para cada ETF. Os pesos digitados recalculam a carteira em todas as abas:
+retornos, múltiplos, desde a entrada, ano-calendário, look-through e top 10. Se a soma não der
+100%, eles são reescalados. Valem só para a sessão de quem digitou; o botão "Restaurar pesos
+oficiais" volta para `PORTFOLIO` (`carteira.py`). Num fechamento mensal, a look-through e o top 10
+usam:
+- o retorno de cada ação no mês, YTD e 12M naquela data (`stock_monthly_returns`, desde dez/2024);
+- a fotografia de holdings mais próxima da data (`holdings_history`; a mais antiga é de 28/09/2026,
+  porque o Morningstar só entrega holdings atuais);
+- market cap e valuation do último pregão.
+
+O X-Ray é sempre o mais recente, com os pesos oficiais.
 
 ## Holdings: regras de tratamento (carteira.py)
 

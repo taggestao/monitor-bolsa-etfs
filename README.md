@@ -12,7 +12,7 @@ Streamlit app that tracks the TAG equity portfolio:
 | DRAM US | 6,6% | Memory (DRAM/HBM/NAND) |
 | GRDU LN | 6,8% | Power grid |
 
-A **Data final** selector in the sidebar (default: latest month-end) recomputes every return as of any month-end since Jan/2022 from Morningstar monthly returns; it also offers the latest daily close.
+A **Data final** selector in the sidebar (default: latest month-end) recomputes every return as of any month-end since Jan/2022 from Morningstar monthly returns; it also offers the latest daily close. The **Carteira TAG** tab repeats the selector and lets you type a different % for each ETF; the whole app is recomputed with those weights for the session.
 
 Tabs: **Visão Geral** (price, AUM, returns for the day/MTD/YTD/12M/24M/36M, 12M vol, valuation), **Estratégia & Ecossistema**, **Top 10 por ETF** (per-stock valuation) and **Carteira TAG** (look-through of positions, sectors vs. S&P 500).
 

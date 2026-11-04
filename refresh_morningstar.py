@@ -52,6 +52,9 @@ STOCK_BATCH = 10
 # Dados cadastrais de ações novas nas holdings (ticker, país, setor, moeda)
 META_DATAPOINTS = {"ticker": "OS385", "country": "BC001", "exchange": "OS01V", "sector": "LA03Z", "cur": "LS05M"}
 HOLDINGS_MAX_AGE = 7   # dias: holdings mais velhas que isso entram no --plan
+HOLDINGS_HISTORY_MAX = 104   # fotografias de holdings guardadas (~2 anos de rodadas semanais)
+STOCK_HISTORY_START = "2024-12-01"   # início do retorno mensal das ações (ações novas recebem desde aqui)
+STOCK_MONTHLY_BATCH = 20
 N_HOLDINGS = 25
 SECTOR_PT = {
     "Technology": "Tecnologia", "Industrials": "Industriais", "Financial Services": "Financeiro",
@@ -177,6 +180,22 @@ def plan_stocks(data, raw_dir):
     for i in range(0, len(need), STOCK_BATCH):
         calls.append({"file": f"stocks_{i // STOCK_BATCH + 1:02d}.json", "tool": "morningstar-data-tool",
                       "investment_ids": need[i:i + STOCK_BATCH], "datapoint_ids": list(STOCK_DATAPOINTS.values())})
+    # retorno mensal das ações: mês(es) que fecharam desde a última gravação; ações novas desde o início
+    today = dt.date.today()
+    mo_end = _month_end_before(today - dt.timedelta(days=1)).isoformat()
+    sm = data.get("stock_monthly_returns", {})
+    groups = {}
+    for i in need:
+        last = max(sm[i]) if sm.get(i) else None
+        if last is None:
+            groups.setdefault(STOCK_HISTORY_START, []).append(i)
+        elif last < mo_end:
+            groups.setdefault(last, []).append(i)
+    for start, ids in sorted(groups.items()):
+        for j in range(0, len(ids), STOCK_MONTHLY_BATCH):
+            calls.append({"file": f"stock_monthly_{start}_{j // STOCK_MONTHLY_BATCH + 1:02d}.json",
+                          "tool": "morningstar-data-tool", "investment_ids": ids[j:j + STOCK_MONTHLY_BATCH],
+                          "datapoint_ids": [MONTHLY_RETURN], "start_date": start, "end_date": today.isoformat()})
     new = [i for i in need if i not in data["stocks"]]
     for i in range(0, len(new), STOCK_BATCH):
         calls.append({"file": f"stock_meta_{i // STOCK_BATCH + 1:02d}.json", "tool": "morningstar-data-tool",
@@ -323,6 +342,9 @@ def apply(data, snap, series, args):
     if holdings:
         data["holdings"] = {k: [list(h) for h in v] for k, v in holdings.items()}
         data["holdings_date"] = h_date
+        hist = data.setdefault("holdings_history", {})
+        hist[h_date] = data["holdings"]
+        data["holdings_history"] = dict(sorted(hist.items())[-HOLDINGS_HISTORY_MAX:])
         log.append(f"Holdings atualizadas em {h_date} (top {N_HOLDINGS} de cada ETF)")
     xray = load_xray(args.raw_dir)
     if xray:
@@ -334,6 +356,21 @@ def apply(data, snap, series, args):
         if ms_id not in data["stocks"] and s.get("OS385"):
             data["stocks"][ms_id] = {**stock_meta(s), **{f: None for f in STOCK_DATAPOINTS}}
             log.append(f"Ação nova: {data['stocks'][ms_id]['ticker']} ({ms_id})")
+
+    # ── Retorno mensal das ações (HP010) até o último fechamento ──
+    sm, n_new = data.setdefault("stock_monthly_returns", {}), 0
+    etf_ids = set(ETF_IDS.values())
+    for ms_id, dps in series.items():
+        if ms_id in etf_ids or MONTHLY_RETURN not in dps:
+            continue
+        cur = sm.setdefault(ms_id, {})
+        for d, v in dps[MONTHLY_RETURN].items():
+            if d <= mo_end:
+                n_new += d not in cur
+                cur[d] = v
+        sm[ms_id] = dict(sorted(cur.items()))
+    if n_new:
+        log.append(f"Retornos mensais de ações: {n_new} novos")
 
     # ── Ações ──
     updated, missing = 0, []
